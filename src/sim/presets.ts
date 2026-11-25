@@ -3822,6 +3822,51 @@ export const PRESETS: Preset[] = [
     },
   },
   {
+    id: 'network-geography',
+    name: 'Zones, regions and network faults',
+    tagline: 'A fast database can still be a slow dependency',
+    description:
+      'One inter-zone hop and one cross-region database call. Tune real request/reply propagation, jitter and asymmetric loss; cut links and compare recovery.',
+    topology: {
+      seed: 7,
+      nodes: [
+        node('client', 'client', 'Client', 40, 200, {
+          rps: 100,
+          timeoutMs: 2000,
+          placementRegion: 0,
+          placementZone: 0,
+        }),
+        node('api', 'service', 'API', 350, 200, {
+          serviceMs: 5,
+          serviceCv: 0,
+          capacity: 64,
+          timeoutMs: 1000,
+          placementRegion: 0,
+          placementZone: 1,
+          crossRegionMs: 80,
+        }),
+        node('db', 'db', 'Database', 690, 200, {
+          serviceMs: 20,
+          serviceCv: 0,
+          capacity: 64,
+          readFraction: 1,
+          placementRegion: 1,
+          placementZone: 1,
+        }),
+      ],
+      edges: [edge('client', 'api'), edge('api', 'db')],
+      annotations: [
+        note(
+          'network-guide',
+          40,
+          400,
+          'Hypothesis: geographic propagation, not database CPU, dominates this design. Select API to tune outgoing one-way profiles; select a wire for directional overrides, measured crossings and call round trips. Cut requests or replies, then restore: replies can be lost after a write has already committed. Move Database to Region ID 0 to reduce network wait. Placement changes do not migrate or replicate data. These latency defaults are illustrative, not cloud measurements.',
+          800,
+        ),
+      ],
+    },
+  },
+  {
     id: 'async-workers',
     name: 'Async workers',
     tagline: 'A backlog that grows faster than it drains',

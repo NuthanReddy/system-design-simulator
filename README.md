@@ -12,7 +12,7 @@ replacing either simulation engine.
 
 | Workbench         | Features                                                                                                                                                                                                                                                                                                                   |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Simulator         | 33 simulated component types, notes/sections, editable connections, individual-request discrete-event simulation, latency/goodput/error charts, load and failure experiments, 25 examples, 18 challenges, 6 incident stories, a 49-step learning path and 119 glossary entries.                                            |
+| Simulator         | 33 simulated component types, notes/sections, editable connections, individual-request discrete-event simulation, latency/goodput/error charts, load and failure experiments, 26 examples, 18 challenges, 6 incident stories, a 50-step learning path and 119 glossary entries.                                            |
 | System Design Lab | 99 building blocks, 82 practice problems across 15 industries, 41 lessons, 93 measured reference designs, guided clarification/estimation/drawing, traffic-day simulation, daily challenges, sandbox, timed Medium/Hard interviews, evidence-based defense, cost/reliability/latency/data-safety scoring and study guides. |
 | Personal workflow | Browser-local progress and saved designs, supported URL sharing and file backups, presentation mode, keyboard controls, accessibility/motion/sound settings, and navigation between the workbenches.                                                                                                                       |
 
@@ -48,6 +48,21 @@ eviction/capacity in bytes, coalescing ordinary cold misses, and replicated
 write buffers are not modeled. Invalidation notification is an idealized
 configured lag; network faults affect actual database/refresh calls, not that
 notification. Dirty reads are shown separately, not called fresh durable data.
+
+## Regions, zones and network paths
+
+Open [Zones, regions and network faults](https://nuthanreddy.github.io/system-design-simulator/?example=network-geography).
+Select a component's **Region and zone** section to opt into placement and tune
+outgoing same-zone/inter-zone/cross-region propagation. Both endpoints must be
+placed. The starting **0.5 / 2 / 80 ms one-way** profiles are illustrative, not
+cloud benchmarks; requests and replies each pay their crossing.
+
+Select a connection to override request/reply delay or jitter, inject asymmetric
+reply loss, and read measured crossing/complete-call means. Existing cable cuts,
+request loss, reply cuts, timeouts and retries remain available. A lost reply
+does not undo a committed write. Unplaced legacy links retain their original
+request-only delay. Placement is not data migration or automatic geographic
+replication; bandwidth queues and TCP congestion are not modeled.
 
 **Hosted-service limitations:** GitHub Pages serves static files, not APIs.
 Cross-device account sync, OAuth sign-in, public leaderboards and encrypted short

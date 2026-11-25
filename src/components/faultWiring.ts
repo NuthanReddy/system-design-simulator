@@ -1,6 +1,8 @@
 import { acksBeforeSafe, behaviourFor, flushesLater } from '../sim/behaviour';
 import type { Engine } from '../sim/engine';
 import { DEFAULT_SEED } from '../sim/seed';
+import { linkProfile } from '../sim/network';
+import type { NetworkEdgeView } from './NetworkControls';
 import type {
   ActiveDuplicate,
   ActiveFailure,
@@ -258,6 +260,7 @@ export interface FaultView {
     | (CableInfo & {
         cutBy?: string;
         lossRate: number;
+        network?: NetworkEdgeView;
         /** Delivering some requests twice, or null. */
         dup: ActiveDuplicate | null;
         /** False for a control edge, which carries no requests to deliver twice. */
@@ -403,6 +406,11 @@ export function faultViewFor(
         state,
         ...(by ? { cutBy: nameOf(by.nodeId) } : {}),
         lossRate: lossOf(e.lossRate),
+        network: {
+          edge: e,
+          profile: linkProfile(from?.config, byId.get(e.to)?.config, e),
+          observed: snapshot?.network?.[e.id],
+        },
         dup: engine.activeDuplicates().find((d) => d.edgeId === e.id) ?? null,
         carriesRequests: carries(e),
         replyCut: engine.activeReplyCuts().find((r) => r.edgeId === e.id) ?? null,

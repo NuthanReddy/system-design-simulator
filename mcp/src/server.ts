@@ -44,6 +44,21 @@ const edge = z.looseObject({
   weight: z.number().optional(),
   control: z.boolean().optional(),
   lossRate: z.number().optional().describe('Share of crossings the link drops, 0 to 1'),
+  latencyMs: z.number().optional().describe('One-way request delay override in ms'),
+  responseLatencyMs: z
+    .number()
+    .optional()
+    .describe('One-way reply delay override in ms'),
+  jitterMs: z
+    .number()
+    .optional()
+    .describe('Independent +/- one-way jitter override in ms'),
+  responseLossRate: z
+    .number()
+    .optional()
+    .describe(
+      'Silent reply loss probability, 0 to 1; work may commit before caller timeout',
+    ),
 });
 
 /*

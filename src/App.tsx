@@ -19,6 +19,7 @@ import type {
   NodeConfig,
   NodeKind,
   RouteStats,
+  SimEdge,
   SimNode,
   SimSnapshot,
   Topology,
@@ -2078,6 +2079,26 @@ export default function App() {
       const next = withEdgeLoss(topoLiveRef.current, edgeId, lossRate);
       if (!next) return;
       history.commit('packet loss', snapRef.current);
+      topoLiveRef.current = next;
+      setTopology(next);
+      engine.setTopology(next);
+      setSnapshot(engine.snapshot());
+      setRoutes(engine.routes());
+    },
+    [engine, history],
+  );
+
+  const handleEdgeNetwork = useCallback(
+    (edgeId: string, patch: Partial<SimEdge>) => {
+      const current = topoLiveRef.current;
+      if (!current.edges.some((edge) => edge.id === edgeId)) return;
+      history.touch('network settings', snapRef.current);
+      const next = {
+        ...current,
+        edges: current.edges.map((edge) =>
+          edge.id === edgeId ? { ...edge, ...patch } : edge,
+        ),
+      };
       topoLiveRef.current = next;
       setTopology(next);
       engine.setTopology(next);
@@ -5716,6 +5737,7 @@ export default function App() {
             suggestions={challenge === undefined}
             faults={inspectorFaults}
             onEdgeLoss={handleEdgeLoss}
+            onEdgeNetwork={handleEdgeNetwork}
             onDuplicate={handleDuplicate}
             onCopy={handleCopySelection}
             loop={selectedLoop}

@@ -165,6 +165,12 @@ describe('protocol tables', () => {
       cacheTtlMs: true,
       cacheInvalidationMs: true,
       cacheStaleMs: true,
+      placementRegion: true,
+      placementZone: true,
+      sameZoneMs: true,
+      interZoneMs: true,
+      crossRegionMs: true,
+      networkJitterMs: true,
     };
     for (const field of Object.keys(every)) expect(WIRE_FIELDS).toContain(field);
   });
@@ -270,6 +276,8 @@ describe('round trip', () => {
         else if (field === 'bulkheadMode') overrides[field] = 'wait';
         else if (field === 'cacheReadPolicy') overrides[field] = 'read-through';
         else if (field === 'cacheWritePolicy') overrides[field] = 'write-back';
+        else if (field === 'placementRegion' || field === 'placementZone')
+          overrides[field] = 7 + i;
         else overrides[field] = 7 + i + WIRE_FIELDS.indexOf(field) / 1000;
       }
       return node(`${kind}-1`, kind, 0, 0, overrides as Partial<NodeConfig>);

@@ -313,7 +313,7 @@ describe('a real outage step', () => {
     press(must('Menu'));
     press(must('Learning path'));
     const d = dialog()!;
-    expect(d.querySelector('.lp-progress')?.textContent).toBe('1 of 49 done');
+    expect(d.querySelector('.lp-progress')?.textContent).toBe('1 of 50 done');
     const row = find(`Continue step 45, ${aws.name}`, d);
     // On the canvas, so it continues; its badge says it is the one open.
     expect(row).not.toBeNull();

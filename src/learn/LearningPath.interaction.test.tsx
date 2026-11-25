@@ -146,7 +146,7 @@ describe('the learning path', () => {
     expect(d.querySelector('.ex-sub')?.textContent).toBe(
       'Every example, challenge and real outage, in an order that builds up.',
     );
-    expect(d.querySelector('.lp-progress')?.textContent).toBe('0 of 49 done');
+    expect(d.querySelector('.lp-progress')?.textContent).toBe('0 of 50 done');
     // How it counts sits with the step, in words.
     expect(d.querySelector('.lp-next-rule')?.textContent).toBe(
       'A short task opens with it. It counts as done once you finish the task.',
@@ -159,7 +159,7 @@ describe('the learning path', () => {
     mount();
     const d = openPath();
     const rows = [...d.querySelectorAll('li.lp-step')];
-    expect(rows).toHaveLength(49);
+    expect(rows).toHaveLength(50);
     rows.forEach((r, i) => {
       const buttons = r.querySelectorAll('button');
       expect(buttons).toHaveLength(1);
@@ -224,7 +224,7 @@ describe('the learning path', () => {
     );
     mount();
     const d = openPath();
-    expect(d.querySelector('.lp-progress')?.textContent).toBe('2 of 49 done');
+    expect(d.querySelector('.lp-progress')?.textContent).toBe('2 of 50 done');
     const first = d.querySelector('section.lp-track')!;
     expect(first.querySelector('.lp-track-count')?.textContent).toBe('2 of 4 done');
     const badges = [...first.querySelectorAll('.lp-badge')].map((s) => s.textContent);

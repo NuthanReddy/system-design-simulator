@@ -113,7 +113,17 @@ export function isTopology(value: unknown): value is Topology {
         !['write-through', 'write-around', 'write-back'].includes(cfg.cacheWritePolicy))
     )
       return false;
-    for (const key of ['cacheTtlMs', 'cacheInvalidationMs', 'cacheStaleMs']) {
+    for (const key of [
+      'cacheTtlMs',
+      'cacheInvalidationMs',
+      'cacheStaleMs',
+      'placementRegion',
+      'placementZone',
+      'sameZoneMs',
+      'interZoneMs',
+      'crossRegionMs',
+      'networkJitterMs',
+    ]) {
       const value = cfg[key];
       if (
         value !== undefined &&
@@ -121,6 +131,13 @@ export function isTopology(value: unknown): value is Topology {
           !Number.isFinite(value) ||
           value < 0 ||
           value > 120000)
+      )
+        return false;
+    }
+    for (const key of ['placementRegion', 'placementZone']) {
+      if (
+        cfg[key] !== undefined &&
+        (!Number.isInteger(cfg[key]) || (cfg[key] as number) > 999)
       )
         return false;
     }
@@ -135,11 +152,34 @@ export function isTopology(value: unknown): value is Topology {
       from: unknown;
       to: unknown;
       weight: unknown;
+      latencyMs: unknown;
+      responseLatencyMs: unknown;
+      jitterMs: unknown;
+      responseLossRate: unknown;
     }>;
     if (typeof e.id !== 'string' || e.id === '') return false;
     if (typeof e.from !== 'string' || typeof e.to !== 'string') return false;
     if (!ids.has(e.from) || !ids.has(e.to)) return false;
     if (!Number.isFinite(e.weight)) return false;
+    for (const key of ['responseLatencyMs', 'jitterMs'] as const) {
+      const value = e[key];
+      if (
+        value !== undefined &&
+        (typeof value !== 'number' ||
+          !Number.isFinite(value) ||
+          value < 0 ||
+          value > 120000)
+      )
+        return false;
+    }
+    if (
+      e.responseLossRate !== undefined &&
+      (typeof e.responseLossRate !== 'number' ||
+        !Number.isFinite(e.responseLossRate) ||
+        e.responseLossRate < 0 ||
+        e.responseLossRate > 1)
+    )
+      return false;
   }
 
   return true;

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "smoke:site": "node tools/smoke-site.mjs",
     "smoke:cache": "node tools/smoke-cache.mjs",
+    "smoke:network": "node tools/smoke-network.mjs",
     "smoke:hosted": "node tools/smoke-hosted.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -213,6 +213,22 @@ export function buildTopology(input: unknown): DesignResult {
     if (typeof raw.latencyMs === 'number' && Number.isFinite(raw.latencyMs)) {
       edge.latencyMs = Math.max(0, raw.latencyMs);
     }
+    for (const key of ['responseLatencyMs', 'jitterMs', 'responseLossRate'] as const) {
+      const value = raw[key];
+      if (value === undefined) continue;
+      const max = key === 'responseLossRate' ? 1 : 120000;
+      if (
+        typeof value !== 'number' ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > max
+      ) {
+        return fail(
+          `${where} has invalid ${key}; use a finite number from 0 to ${max}.`,
+        );
+      }
+      edge[key] = value;
+    }
     // Refused rather than clamped, like the seed: 5 most likely meant 5%,
     // and a link that drops everything is not what was asked for.
     if (raw.lossRate !== undefined) {

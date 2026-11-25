@@ -13,6 +13,7 @@ import type {
   NodeConfig,
   NodeKind,
   NodeStats,
+  SimEdge,
   SimNode,
   SystemStats,
 } from '../sim/types';
@@ -35,6 +36,7 @@ import {
 import { defaultConfig } from '../sim/presets';
 import { suggestionFor } from '../content/suggestions';
 import { cacheAdvice } from '../learn/cacheAdvice';
+import { NetworkEdgeControls, NetworkNodeControls } from './NetworkControls';
 import { KIND_NAME, KIND_TERM } from './nodeVisuals';
 import {
   NA,
@@ -2962,6 +2964,7 @@ export interface InspectorProps {
    * it, or without `faults`, a connection shows no loss control.
    */
   onEdgeLoss?: (edgeId: string, lossRate: number) => void;
+  onEdgeNetwork?: (edgeId: string, patch: Partial<SimEdge>) => void;
   /**
    * Duplicate or copy the selection, beside Delete, so a touch screen
    * reaches both without a keyboard. Optional: without them only Delete
@@ -2987,6 +2990,7 @@ export function Inspector({
   onDeleteMany,
   faults,
   onEdgeLoss,
+  onEdgeNetwork,
   onDuplicate,
   onCopy,
   loop,
@@ -3032,6 +3036,18 @@ export function Inspector({
                       />
                     </Section>
                   ) : null}
+                  {onEdgeNetwork &&
+                    faults.edge.network &&
+                    faults.edge.carriesRequests && (
+                      <Section title="Network path">
+                        <NetworkEdgeControls
+                          network={faults.edge.network}
+                          onChange={(patch) => {
+                            if (faults.edge) onEdgeNetwork(faults.edge.id, patch);
+                          }}
+                        />
+                      </Section>
+                    )}
                   <Section title="Break it on purpose">
                     <EdgeFaultControls
                       key={faults.edge.id}
@@ -3790,6 +3806,15 @@ function SingleInspector({
             </div>
           </Section>
         ))}
+
+        {node.kind !== 'autoscaler' && (
+          <Section title="Region and zone">
+            <NetworkNodeControls
+              config={cfg}
+              onChange={(patch) => onChange(node.id, patch)}
+            />
+          </Section>
+        )}
 
         {takesCorrectness(node.kind) && (
           <Section title="Correctness">

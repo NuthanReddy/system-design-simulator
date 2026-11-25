@@ -121,6 +121,14 @@ as real queueing, latency and failures, measured from simulated requests.
 - An edge is a request path \`{ "from", "to" }\`. \`weight\` (default 1)
   splits traffic when a node picks one edge out of several. \`lossRate\`
   (0 to 1, default 0) drops that share of the requests crossing it.
+- Put both endpoints in \`placementRegion\` / \`placementZone\` to apply
+  illustrative one-way geographic defaults to requests AND replies. The
+  source's \`sameZoneMs\`, \`interZoneMs\`, \`crossRegionMs\` and
+  \`networkJitterMs\` are configurable, not vendor benchmarks.
+  Edge \`latencyMs\`, \`responseLatencyMs\` and \`jitterMs\` override those
+  defaults rather than adding to them. Unplaced legacy links delay requests
+  only. \`responseLossRate\` silently loses completed replies; configure a
+  caller timeout, and account for work that may commit before a retry.
 - A whole \`.breakscale\` file is also accepted as is.
 
 ## How requests move

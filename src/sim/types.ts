@@ -35,6 +35,18 @@ export type NodeKind =
 
 /** Tunable knobs per node kind. Not every field applies to every kind. */
 export interface NodeConfig {
+  /** Opt-in region identifier, 0..999. Unset means no placement network profile. */
+  placementRegion?: number;
+  /** Availability-zone identifier within placementRegion, 0..999. Default 0. */
+  placementZone?: number;
+  /** Default same-zone one-way propagation in ms for this caller's outgoing links. Illustrative default 0.5. */
+  sameZoneMs?: number;
+  /** Default inter-zone one-way propagation in ms for this caller's outgoing links. Illustrative default 2. */
+  interZoneMs?: number;
+  /** Default cross-region one-way propagation in ms for this caller's outgoing links. Illustrative default 80. */
+  crossRegionMs?: number;
+  /** Uniform +/- propagation jitter in ms on this caller's placed links. Default 0. */
+  networkJitterMs?: number;
   /**
    * Parallel request slots ON ONE INSTANCE -- threads, connections, workers
    * inside a single process. This is a property of the machine image, not of
@@ -699,6 +711,12 @@ export interface SimEdge {
    * means an instantaneous hop, which is what every current preset uses.
    */
   latencyMs?: number;
+  /** One-way reply propagation override in ms. Unplaced legacy links default to 0. */
+  responseLatencyMs?: number;
+  /** Uniform +/- jitter override in ms, independently sampled each direction. */
+  jitterMs?: number;
+  /** Probability a completed reply is silently lost, 0..1; requires caller timeout for recovery. */
+  responseLossRate?: number;
   /**
    * DECLARED BUT UNUSED. Link capacity in requests/sec. The networking phase
    * will use this to queue and delay traffic once an edge is saturated;
@@ -1722,6 +1740,17 @@ export interface SimSnapshot {
   history: HistoryPoint[];
   /** Per-edge requests/sec, keyed by edge id. */
   edgeFlow: Record<string, number>;
+  /** Observed rolling means in ms, not configured latency or a sum of service-only timings. */
+  network?: Record<
+    string,
+    {
+      requestMs: number;
+      responseMs: number;
+      roundTripMs: number;
+      arrivedRps: number;
+      answeredRps: number;
+    }
+  >;
   /**
    * Why each edge is in the state it is, keyed by edge id -- one entry per
    * edge in the topology, always populated. Read alongside `edgeFlow`: the

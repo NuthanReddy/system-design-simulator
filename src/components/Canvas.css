@@ -492,6 +492,13 @@
   pointer-events: none;
 }
 
+.cv-placement {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+}
+
 /* T4 — the primary metric. Promotes to T5 when the node is selected. */
 .cv-node-primary {
   font-family: var(--mono);

@@ -12,6 +12,7 @@ import type {
 } from './engine-types';
 import { UnflushedWrites } from './durability';
 import { MinHeap, type Timed } from './heap';
+import { crossingDelay, linkProfile } from './network';
 import { OpLogRecorder, type OpLog, type OpLogOptions } from './oplog';
 import { cos, exp, pow } from './fdlibm';
 import { sanitizeFaults } from './faults';
@@ -165,6 +166,7 @@ const EV_MOVED = 10;
 const EV_HERD = 11;
 /** One caller of a herd spread over a window, firing at its own moment. */
 const EV_HERD_CALLER = 12;
+const EV_NETWORK_ANSWER = 13;
 
 interface Ev extends Timed {
   time: number;
@@ -196,6 +198,8 @@ interface LoopBudget {
 }
 
 interface Req {
+  networkSentAt?: number;
+  networkRequestMs?: number;
   /** Unique-per-incarnation id; bumped on every reuse so stale timers die. */
   token: number;
   /** Node currently handling this request. */
@@ -1145,6 +1149,17 @@ export class Engine implements BehaviourCtx {
   private pausedCount = 0;
   /** Answers a paused caller is about to be handed, by the call that gave them. */
   private pausedAnswers = new Map<Req, ParkedEv>();
+  private networkAnswers = new Map<Req, ParkedEv>();
+  private networkTiming = new Map<
+    string,
+    {
+      request: RateCounter;
+      response: RateCounter;
+      elapsed: RateCounter;
+      arrived: RateCounter;
+      answered: RateCounter;
+    }
+  >();
 
   /**
    * The fault schedule, sorted by `atMs` (stable, so entries sharing a time
@@ -2509,6 +2524,7 @@ export class Engine implements BehaviourCtx {
       nodes: nodeOut,
       history: this.history,
       edgeFlow: edgeOut,
+      ...(this.networkTiming.size > 0 ? { network: this.snapshotNetwork() } : {}),
       edgeState: this.snapshotEdgeState(edgeOut),
       failuresByReason: this.failures,
       activeFailures: this.snapshotFailures(),
@@ -2550,6 +2566,81 @@ export class Engine implements BehaviourCtx {
       const pending = booked - target.instances;
       if (pending > 0) target.instancesPending = pending;
     }
+  }
+
+  private snapshotNetwork(): NonNullable<SimSnapshot['network']> {
+    const out: NonNullable<SimSnapshot['network']> = {};
+    for (const [id, timing] of this.networkTiming) {
+      if (!this.edgeFlow.has(id)) continue;
+      const arrived = timing.arrived.rate(this.now);
+      const answered = timing.answered.rate(this.now);
+      out[id] = {
+        requestMs: arrived > 0 ? timing.request.rate(this.now) / arrived : 0,
+        responseMs: answered > 0 ? timing.response.rate(this.now) / answered : 0,
+        roundTripMs: answered > 0 ? timing.elapsed.rate(this.now) / answered : 0,
+        arrivedRps: arrived,
+        answeredRps: answered,
+      };
+    }
+    return out;
+  }
+
+  private networkCounters(edgeId: string) {
+    let timing = this.networkTiming.get(edgeId);
+    if (!timing) {
+      timing = {
+        request: new RateCounter(),
+        response: new RateCounter(),
+        elapsed: new RateCounter(),
+        arrived: new RateCounter(),
+        answered: new RateCounter(),
+      };
+      this.networkTiming.set(edgeId, timing);
+    }
+    return timing;
+  }
+
+  private recordNetworkArrival(req: Req): void {
+    if (req.networkSentAt === undefined) return;
+    const timing = this.networkCounters(req.viaEdge);
+    timing.request.add(this.now, req.networkRequestMs ?? 0);
+    timing.arrived.add(this.now, 1);
+  }
+
+  private deliverNetworkAnswer(child: Req): void {
+    const answer = this.networkAnswers.get(child);
+    if (!answer) return;
+    this.networkAnswers.delete(child);
+    const parent = answer.parent;
+    if (
+      parent === null ||
+      parent.token !== answer.parentToken ||
+      parent.resolved ||
+      child.parent !== parent
+    ) {
+      this.recycle(child);
+      return;
+    }
+    if (this.cutEdges.has(child.viaEdge) || this.loseReply(child.viaEdge)) {
+      child.replyLost = true;
+      if (!((this.nodes.get(parent.nodeId)?.config.timeoutMs ?? 0) > 0)) {
+        const stranded = this.stranded.get(child.viaEdge) ?? [];
+        stranded.push({ req: parent, token: parent.token });
+        this.stranded.set(child.viaEdge, stranded);
+      }
+      return;
+    }
+    const timing = this.networkCounters(child.viaEdge);
+    timing.response.add(this.now, this.now - answer.time);
+    timing.elapsed.add(this.now, this.now - (child.networkSentAt ?? answer.time));
+    timing.answered.add(this.now, 1);
+    if (
+      this.pausedCount > 0 &&
+      this.holdAnswer(child, parent, answer.ok, answer.reason, answer.latencyMs)
+    )
+      return;
+    this.childResolvedFrom(child, parent, answer.ok, answer.reason, answer.latencyMs);
+    this.recycle(child);
   }
 
   /**
@@ -2684,6 +2775,8 @@ export class Engine implements BehaviourCtx {
     this.stranded.clear();
     this.pausedCount = 0;
     this.pausedAnswers.clear();
+    this.networkAnswers.clear();
+    this.networkTiming.clear();
     this.snapFailures.length = 0;
     this.scheduleNext = 0;
     this.nextFaultMs = this.schedule.length > 0 ? this.schedule[0].atMs : Infinity;
@@ -2924,8 +3017,16 @@ export class Engine implements BehaviourCtx {
         // now offered to the target. A caller that already gave up during the
         // crossing leaves a resolved request, which is dropped here.
         if (ev.req && ev.req.token === ev.token && !ev.req.resolved) {
-          this.admit(state, ev.req);
+          if (ev.req.networkSentAt !== undefined && this.cutEdges.has(ev.req.viaEdge)) {
+            this.resolve(ev.req, false, 'partitioned', 0);
+          } else {
+            this.recordNetworkArrival(ev.req);
+            this.admit(state, ev.req);
+          }
         }
+        break;
+      case EV_NETWORK_ANSWER:
+        if (ev.req && ev.req.token === ev.token) this.deliverNetworkAnswer(ev.req);
         break;
       case EV_BEHAVIOUR_WAKE:
         if (ev.req && ev.req.token === ev.token && !ev.req.resolved) {
@@ -2976,6 +3077,9 @@ export class Engine implements BehaviourCtx {
         break;
       case EV_PAUSE_ANSWER:
         this.deliverHeldAnswer(req);
+        break;
+      case EV_NETWORK_ANSWER:
+        this.deliverNetworkAnswer(req);
         break;
       case EV_TIMEOUT:
         this.onTimeout(req);
@@ -3506,8 +3610,24 @@ export class Engine implements BehaviourCtx {
     // bandwidthRps is declared on SimEdge but not yet applied; the networking
     // phase adds it alongside this delay.
     // The first copy is offered first, and the second right behind it.
-    const linkMs = edge.latencyMs;
-    if (linkMs !== undefined && linkMs > 0) {
+    const profile = linkProfile(this.nodes.get(edge.from)?.config, target.config, edge);
+    const linkMs = crossingDelay(profile.requestMs, profile.jitterMs, () =>
+      this.rng.next(),
+    );
+    const observed =
+      profile.scope !== 'unplaced' ||
+      edge.responseLatencyMs !== undefined ||
+      edge.jitterMs !== undefined ||
+      edge.responseLossRate !== undefined;
+    if (observed) {
+      child.networkSentAt = this.now;
+      child.networkRequestMs = linkMs;
+      if (twin !== null) {
+        twin.networkSentAt = this.now;
+        twin.networkRequestMs = linkMs;
+      }
+    }
+    if (linkMs > 0) {
       this.push(this.now + linkMs, EV_LINK_ARRIVE, target.id, child, child.token);
       if (twin !== null) {
         this.push(this.now + linkMs, EV_LINK_ARRIVE, target.id, twin, twin.token);
@@ -3515,8 +3635,12 @@ export class Engine implements BehaviourCtx {
       return;
     }
 
+    this.recordNetworkArrival(child);
     this.admit(target, child);
-    if (twin !== null) this.admit(target, twin);
+    if (twin !== null) {
+      this.recordNetworkArrival(twin);
+      this.admit(target, twin);
+    }
   }
 
   /* ---------------- admission ---------------- */
@@ -4315,7 +4439,7 @@ export class Engine implements BehaviourCtx {
   private onTimeout(call: Req): void {
     // A call whose answer was lost on the way back is done, but its caller
     // is still waiting for it, so this is where that wait ends.
-    if (call.resolved && !call.replyLost) return;
+    if (call.resolved && !call.replyLost && !this.networkAnswers.has(call)) return;
 
     // Attribute the timeout to the caller that gave up.
     const parent = call.parent;
@@ -4381,8 +4505,18 @@ export class Engine implements BehaviourCtx {
     }
     // An answer to a caller, back across a cable that loses replies, never
     // gets there. The work it reports was done all the same.
+    const replyEdge =
+      req.parent !== null && req.networkSentAt !== undefined
+        ? this.topology.edges.find((edge) => edge.id === req.viaEdge)
+        : undefined;
+    const replyLoss = replyEdge?.responseLossRate ?? 0;
     const replyLost =
-      this.replyCut.size > 0 && req.parent !== null && this.loseReply(req.viaEdge);
+      req.parent !== null &&
+      ((req.networkSentAt === undefined &&
+        this.replyCut.size > 0 &&
+        this.loseReply(req.viaEdge)) ||
+        (replyLoss > 0 && this.rng.next() < replyLoss) ||
+        (req.networkSentAt !== undefined && this.cutEdges.has(req.viaEdge)));
     const log = this.opLog;
     if (log !== null && req.rid > 0) {
       const heard =
@@ -4519,6 +4653,27 @@ export class Engine implements BehaviourCtx {
         }
         list.push({ req: parent, token: parent.token });
       }
+      return;
+    }
+    if (replyEdge && req.networkSentAt !== undefined) {
+      const profile = linkProfile(
+        this.nodes.get(replyEdge.from)?.config,
+        this.nodes.get(replyEdge.to)?.config,
+        replyEdge,
+      );
+      const delay = crossingDelay(profile.responseMs, profile.jitterMs, () =>
+        this.rng.next(),
+      );
+      const answer = parkedEv(EV_NETWORK_ANSWER, this.now, req, req.token);
+      answer.parent = parent;
+      answer.parentToken = parent.token;
+      answer.ok = ok;
+      answer.reason = reason;
+      answer.latencyMs = latencyMs + delay;
+      this.networkAnswers.set(req, answer);
+      if (delay > 0)
+        this.push(this.now + delay, EV_NETWORK_ANSWER, req.nodeId, req, req.token);
+      else this.deliverNetworkAnswer(req);
       return;
     }
     // A paused caller is handed the answer when it carries on.
@@ -5451,6 +5606,8 @@ export class Engine implements BehaviourCtx {
       pooled.ownMs = 0;
       pooled.resolved = false;
       pooled.replyLost = false;
+      pooled.networkSentAt = undefined;
+      pooled.networkRequestMs = undefined;
       pooled.key = 0;
       pooled.isWrite = false;
       pooled.operationClassified = undefined;

@@ -240,6 +240,12 @@ const FIELDS = [
   'cacheTtlMs',
   'cacheInvalidationMs',
   'cacheStaleMs',
+  'placementRegion',
+  'placementZone',
+  'sameZoneMs',
+  'interZoneMs',
+  'crossRegionMs',
+  'networkJitterMs',
 ] as const satisfies readonly ConfigField[];
 
 const CACHE_READ_POLICIES = [
@@ -387,8 +393,18 @@ const EDGE_WEIGHT = 1 << 1;
 const EDGE_LATENCY = 1 << 2;
 const EDGE_BANDWIDTH = 1 << 3;
 const EDGE_LOSS = 1 << 4;
+const EDGE_RESPONSE_LATENCY = 1 << 5;
+const EDGE_JITTER = 1 << 6;
+const EDGE_RESPONSE_LOSS = 1 << 7;
 const EDGE_KNOWN =
-  EDGE_CONTROL | EDGE_WEIGHT | EDGE_LATENCY | EDGE_BANDWIDTH | EDGE_LOSS;
+  EDGE_CONTROL |
+  EDGE_WEIGHT |
+  EDGE_LATENCY |
+  EDGE_BANDWIDTH |
+  EDGE_LOSS |
+  EDGE_RESPONSE_LATENCY |
+  EDGE_JITTER |
+  EDGE_RESPONSE_LOSS;
 
 /** Annotation header, bit 0: 0 is a note, 1 is a section. */
 const ANN_SECTION = 1 << 0;
@@ -858,6 +874,9 @@ function packEdge(w: Writer, edge: SimEdge, index: Map<string, number>): void {
   if (finite(edge.latencyMs)) flags |= EDGE_LATENCY;
   if (finite(edge.bandwidthRps)) flags |= EDGE_BANDWIDTH;
   if (finite(edge.lossRate)) flags |= EDGE_LOSS;
+  if (finite(edge.responseLatencyMs)) flags |= EDGE_RESPONSE_LATENCY;
+  if (finite(edge.jitterMs)) flags |= EDGE_JITTER;
+  if (finite(edge.responseLossRate)) flags |= EDGE_RESPONSE_LOSS;
   w.varint(from);
   // The flags byte is folded away for the plain edge, which is nearly all
   // of them: one bit on `to` says whether it follows.
@@ -868,6 +887,9 @@ function packEdge(w: Writer, edge: SimEdge, index: Map<string, number>): void {
   if (flags & EDGE_LATENCY) w.num(edge.latencyMs as number);
   if (flags & EDGE_BANDWIDTH) w.num(edge.bandwidthRps as number);
   if (flags & EDGE_LOSS) w.num(edge.lossRate as number);
+  if (flags & EDGE_RESPONSE_LATENCY) w.num(edge.responseLatencyMs as number);
+  if (flags & EDGE_JITTER) w.num(edge.jitterMs as number);
+  if (flags & EDGE_RESPONSE_LOSS) w.num(edge.responseLossRate as number);
 }
 
 function finite(v: number | undefined): v is number {
@@ -968,6 +990,26 @@ export function unpackTopology(bytes: Uint8Array): Topology | null {
     }
 
     const tail = r.done() ? null : unpackTail(r, nodes, edges);
+    for (const { config } of nodes) {
+      for (const field of ['placementRegion', 'placementZone'] as const) {
+        const value = config[field];
+        if (
+          value !== undefined &&
+          (!Number.isInteger(value) || value < 0 || value > 999)
+        )
+          return null;
+      }
+      for (const field of [
+        'sameZoneMs',
+        'interZoneMs',
+        'crossRegionMs',
+        'networkJitterMs',
+      ] as const) {
+        const value = config[field];
+        if (value !== undefined && (!finite(value) || value < 0 || value > 120000))
+          return null;
+      }
+    }
 
     // Bytes after the tail mean the link is not what it claims to be.
     if (!r.done()) return null;
@@ -1185,6 +1227,19 @@ function unpackEdge(
   if (flags & EDGE_LATENCY) edge.latencyMs = r.num();
   if (flags & EDGE_BANDWIDTH) edge.bandwidthRps = r.num();
   if (flags & EDGE_LOSS) edge.lossRate = r.num();
+  if (flags & EDGE_RESPONSE_LATENCY) edge.responseLatencyMs = r.num();
+  if (flags & EDGE_JITTER) edge.jitterMs = r.num();
+  if (flags & EDGE_RESPONSE_LOSS) edge.responseLossRate = r.num();
+  for (const field of ['responseLatencyMs', 'jitterMs'] as const) {
+    const value = edge[field];
+    if (value !== undefined && (value < 0 || value > 120000))
+      throw new WireError('invalid network delay');
+  }
+  if (
+    edge.responseLossRate !== undefined &&
+    (edge.responseLossRate < 0 || edge.responseLossRate > 1)
+  )
+    throw new WireError('invalid reply loss');
   return edge;
 }
 

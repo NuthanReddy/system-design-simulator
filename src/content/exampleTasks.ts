@@ -96,6 +96,32 @@ function fmt(n: number): string {
 
 export const EXAMPLE_TASKS: readonly ExampleTask[] = [
   {
+    presetId: 'network-geography',
+    goal: 'Distinguish time crossing a network from time doing database work.',
+    steps: [
+      {
+        text: 'Select API and set Cross-region one-way delay to 150 milliseconds. Observe the round trip, not just one crossing.',
+        field: 'Cross-region one-way delay',
+        when: [atLeast(setting('api', 'crossRegionMs'), 150), atLeast(P99, 300)],
+        holdMs: HOLD,
+        action: { kind: 'select', node: 'api' },
+        ring: 'db',
+        figs: [FIG_P99, fig(busy('db'), 'database busy')],
+      },
+      {
+        text: 'Select Database and set Region ID to 0. Keep Zone ID 1, beside API, then let the old long calls drain.',
+        field: 'Region ID',
+        when: [below(setting('db', 'placementRegion'), 1), below(P99, 80)],
+        holdMs: HOLD,
+        action: { kind: 'select', node: 'db' },
+        ring: 'db',
+        figs: [FIG_P99],
+      },
+    ],
+    learned:
+      'Cross-region delay is paid by requests and replies, including the caller deadline. Moving a database nearer is a latency remedy, not automatic failover or replication. Cut a wire or lose replies to test the consequences before choosing a topology.',
+  },
+  {
     presetId: 'cache-policies',
     goal: 'Prove that cache retention, not parallel database work, changes the backing load.',
     steps: [

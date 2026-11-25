@@ -38,8 +38,8 @@ Status notation:
 | Faults          | Crash/restart, instance failure, slow/stall where meaningful, node and connection failure controls, repair, fault history/replay and reversible experiments.                                                                      | `src/components/FaultControls.tsx`, `src/components/faultWiring.ts`; Source/test; Browser database crash.                                                                |
 | Correctness     | Payment/write workloads; duplicate charge, acknowledged write loss and read-your-own-write goals; idempotency/durability/replication/consistency controls where applicable; first violating request traces.                       | `src/sim/`, `src/components/Inspector.tsx`, `src/breakitJob.ts`; Source/test.                                                                                            |
 | Failure search  | “Can you break it?” searches counterexamples; “Find the problem” provides measured bottleneck feedback; experiment replay/undo.                                                                                                   | `src/useBreakSearch.ts`, `src/learn/finding.ts`, `src/learn/FindProblem.tsx`; Source/test.                                                                               |
-| Guided learning | Four-step onboarding tour, per-example tasks, progress/badges, “What happened” timeline and a 49-step learning path (25 examples, 18 challenges, 6 incidents). | `src/learn/`, `src/content/learningPath.ts`; retained content plus a personal measured cache-policy exercise. |
-| Catalogs | All original 24 examples plus Cache policies and freshness, 18 challenges and 6 historical incident stories, including watch/fix flows, budgets/goals and challenge-locked fields. | `src/sim/presets.ts`, `src/sim/challenges.ts`, `src/content/`. |
+| Guided learning | Four-step onboarding tour, per-example tasks, progress/badges, “What happened” timeline and a 50-step learning path (26 examples, 18 challenges, 6 incidents). | `src/learn/`, `src/content/learningPath.ts`; retained content plus measured cache-policy and geographic-latency exercises. |
+| Catalogs | All original 24 examples plus Cache policies and freshness and Zones, regions and network faults, 18 challenges and 6 historical incident stories, including watch/fix flows, budgets/goals and challenge-locked fields. | `src/sim/presets.ts`, `src/sim/challenges.ts`, `src/content/`. |
 | Saved designs   | Autosave, named local designs, versioned design serialization, import/export `.breakscale`, supported fragment links and full-browser backup/restore.                                                                             | `src/savedDesigns.ts`, `src/share/`, `src/components/Settings.tsx`; Source/test; Browser fragment share survives navigation and reload.                                  |
 | Exports         | Diagram SVG/PNG and design file export, share controls. Encoded fragment links work without upload; large diagrams can exceed the 2,000-character URL limit and require file export.                                              | `src/share/`, `src/components/Settings.tsx`; Source/test; Browser small fragment link.                                                                                   |
 | Presentation    | Reduced-chrome presentation mode, component explanation and crash/slow/repair keys.                                                                                                                                               | `src/App.tsx`; Browser Shift+P and Stop presenting. Escape is not the presentation exit shortcut.                                                                        |
@@ -262,8 +262,47 @@ comparison. Focused engine cases separately verify deterministic replay,
 single-call misses, delegated-link retries, expiry, independent writers,
 background completion accounting and no resurrection after crash/recovery.
 
-**Subsequent requested stages (not claimed implemented by this cache release):**
-explicit region/zone placement and tunable directional network profiles;
+### Personal geography/network extension
+
+The primary event engine now supports opt-in component region/availability-zone
+placement and caller-configurable same-zone, inter-zone and cross-region
+propagation. Both endpoints must be placed; default one-way delays are
+illustrative **0.5 / 2 / 80 ms**, not provider measurements. Region/zone IDs
+are educational identifiers, not automatic cloud mapping. Per-link request,
+reply and jitter overrides replace defaults; jitter is independent uniform
+plus/minus variation clamped at zero. Delays affect real deliveries, occupied
+caller slots, deadlines/retries, backing-store calls and cache refreshes.
+
+The inspector exposes actual rolling mean request/reply crossings and complete
+call round trips, including target work/queue/downstream waits. These measure
+arrived requests/delivered replies; lost or timed-out replies are excluded.
+An application paused after its reply arrives adds further application wait,
+visible in end-to-end latency rather than wire crossing time.
+
+Old unplaced links retain request-only `latencyMs` behavior and unchanged RNG
+draws. Existing immediate request-loss errors, partitions, reply blackholes,
+duplicates and recovery remain available. Configurable reply loss is silent:
+work may commit while a caller times out/retries. Placement-aware links check
+cuts during request/reply transit. Lost replies without a caller deadline can
+strand a caller even after connectivity is restored.
+
+Open **Zones, regions and network faults** (`?example=network-geography`) for
+a measured two-crossing geographic latency exercise. Source/target placement,
+profiles, directional overrides and reply loss survive design sharing/import.
+This does not simulate data migration, geographic replication/quorums, TCP
+congestion/retransmission, packet sizes, link bandwidth queues or real cloud
+measurements. The pre-existing Region component remains an explicit failover
+router, not a geographic container.
+
+Verification includes a 3,489-test full simulator regression and compiled
+`tools/smoke-network.mjs` controls: 150 ms request propagation plus 250 ms
+reply propagation and 20 ms database service produced a measured 420 ms
+call round trip. Silent reply loss removed delivered-reply samples while
+work continued; removing loss restored them. Live placement labels and
+encoded-share reload were checked. The cache browser suite was rerun on
+the geographic build; both browser runs reported no page/asset errors.
+
+**Subsequent requested stages (not claimed implemented by these extensions):**
 scoped seeded chaos with baseline/hypothesis and recovery comparison; broader
 evidence-backed diagnosis/remedies; Linux scoped resource budgets and
 Kubernetes scheduling/readiness/resource behavior. Existing manual network

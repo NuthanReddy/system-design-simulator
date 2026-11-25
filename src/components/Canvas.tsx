@@ -3432,6 +3432,9 @@ export const NodeView = memo(function NodeView({
           : KIND_NAME[node.kind],
         node.label,
         readout ? `${readout.primary.value} ${readout.primary.label}` : null,
+        node.config.placementRegion !== undefined
+          ? `region ${node.config.placementRegion}, zone ${node.config.placementZone ?? 0}`
+          : null,
         /* The structure is announced, not just drawn. A stack of cards, a
              strip of partitions and a filling vessel are all pure geometry —
              a screen-reader user has no access to any of them, and they are
@@ -3475,6 +3478,11 @@ export const NodeView = memo(function NodeView({
           card of the stack rather than an object sitting on top of one. */}
       {structure === 'stack' && showCorner && (
         <InstanceStack live={units?.length ?? 1} pending={pending} />
+      )}
+      {node.config.placementRegion !== undefined && (
+        <text className="cv-placement" x={0} y={-28} aria-hidden="true">
+          Region {node.config.placementRegion} / Zone {node.config.placementZone ?? 0}
+        </text>
       )}
 
       {/* A fitted card on a phone is about 34px tall, under the 44px a

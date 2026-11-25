@@ -196,6 +196,10 @@ export const LEARNING_PATH: readonly PathTrack[] = [
         'cache-policies',
         'Measure cache misses and test freshness and write tradeoffs.',
       ),
+      ex(
+        'network-geography',
+        'Measure geographic round trips and test network failure assumptions.',
+      ),
     ],
   },
 ];
