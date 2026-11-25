@@ -189,8 +189,8 @@ inventory.
 
 | Check                           | Observed outcome                                                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Simulator suite                 | 200 files, 3,411 tests passed.                                                                                                                                                    |
-| Navigation regression selectors | 4 files, 27 tests passed after adding the cross-workbench menu link.                                                                                                              |
+| Simulator suite                 | 201 files, 3,414 tests passed, including the personal Worker checks.                                                                                                               |
+| Navigation / backup / sharing   | 5 files, 57 targeted tests passed.                                                                                                                                               |
 | Learning model selftest         | 194 passed, 0 failed.                                                                                                                                                             |
 | Learning content runner         | 82 problems, 41 lessons, 93 designs; all 82 first designs pass; no content issues.                                                                                                |
 | Production build                | TypeScript, Vite and learning esbuild release succeed; both compiled apps and reading pages exist in `dist`. Vite reports a large preserved app chunk.                            |
@@ -249,3 +249,20 @@ The final simulator/Worker suite passes 201 files and 3,414 tests. The static
 build retains disabled hosted features and truthful notices pending approved
 provider/domain/OAuth setup. No upstream backend domain, resource binding or
 simulated hosted-account preview is used.
+
+### Published website verification
+
+The compiled website is live at
+<https://nuthanreddy.github.io/system-design-simulator/>.
+Application release `12bb00282213ae7ec811f00bc1c479dd48be6e5e` passed the
+[GitHub Pages workflow](https://github.com/NuthanReddy/system-design-simulator/actions/runs/45608904801)
+and deployed successfully.
+
+The same browser smoke then passed against the public HTTPS website, not only
+the local preview: zero uncaught page errors or failed same-site assets,
+100x offered load, database failure, encoded sharing/reload, presentation,
+82-problem filtering, 41 lessons, identical full-day replay and itemized cost,
+complete interview/report, settings and static reading without JavaScript.
+This verifies the static release; personal OAuth, cross-device hosted sync,
+public boards and encrypted short-link storage still require the owner setup
+described in the hosted-feature plan.
