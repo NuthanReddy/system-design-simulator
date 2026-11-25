@@ -38,8 +38,8 @@ Status notation:
 | Faults          | Crash/restart, instance failure, slow/stall where meaningful, node and connection failure controls, repair, fault history/replay and reversible experiments.                                                                      | `src/components/FaultControls.tsx`, `src/components/faultWiring.ts`; Source/test; Browser database crash.                                                                |
 | Correctness     | Payment/write workloads; duplicate charge, acknowledged write loss and read-your-own-write goals; idempotency/durability/replication/consistency controls where applicable; first violating request traces.                       | `src/sim/`, `src/components/Inspector.tsx`, `src/breakitJob.ts`; Source/test.                                                                                            |
 | Failure search  | “Can you break it?” searches counterexamples; “Find the problem” provides measured bottleneck feedback; experiment replay/undo.                                                                                                   | `src/useBreakSearch.ts`, `src/learn/finding.ts`, `src/learn/FindProblem.tsx`; Source/test.                                                                               |
-| Guided learning | Four-step onboarding tour, per-example tasks, progress/badges, “What happened” timeline and a 48-step learning path (24 examples, 18 challenges, 6 incidents).                                                                    | `src/learn/`, `src/content/learningPath.ts`; Source/test.                                                                                                                |
-| Catalogs        | All 24 examples, 18 challenges and 6 historical incident stories, including watch/fix flows, budgets/goals and challenge-locked fields.                                                                                           | `src/sim/presets.ts`, `src/sim/challenges.ts`, `src/content/`; Source/test.                                                                                              |
+| Guided learning | Four-step onboarding tour, per-example tasks, progress/badges, “What happened” timeline and a 49-step learning path (25 examples, 18 challenges, 6 incidents). | `src/learn/`, `src/content/learningPath.ts`; retained content plus a personal measured cache-policy exercise. |
+| Catalogs | All original 24 examples plus Cache policies and freshness, 18 challenges and 6 historical incident stories, including watch/fix flows, budgets/goals and challenge-locked fields. | `src/sim/presets.ts`, `src/sim/challenges.ts`, `src/content/`. |
 | Saved designs   | Autosave, named local designs, versioned design serialization, import/export `.breakscale`, supported fragment links and full-browser backup/restore.                                                                             | `src/savedDesigns.ts`, `src/share/`, `src/components/Settings.tsx`; Source/test; Browser fragment share survives navigation and reload.                                  |
 | Exports         | Diagram SVG/PNG and design file export, share controls. Encoded fragment links work without upload; large diagrams can exceed the 2,000-character URL limit and require file export.                                              | `src/share/`, `src/components/Settings.tsx`; Source/test; Browser small fragment link.                                                                                   |
 | Presentation    | Reduced-chrome presentation mode, component explanation and crash/slow/repair keys.                                                                                                                                               | `src/App.tsx`; Browser Shift+P and Stop presenting. Escape is not the presentation exit shortcut.                                                                        |
@@ -74,7 +74,7 @@ derived headroom and component-specific live statistics remain available.
 | Client             | `client`       | `rps`, `traffic`, `trafficPeriodS`, `burstSize`, `herdSize`, `herdSpreadMs`, `keySkew`, `timeoutMs`, `retries` |
 | Load balancer      | `lb`           | `instances`, `capacity`, `serviceMs`, `queueLimit`                                                             |
 | Service            | `service`      | `instances`, `capacity`, `serviceMs`, `serviceCv`, `queueLimit`, `errorRate`, `timeoutMs`, `retries`           |
-| Cache              | `cache`        | `hitRate`, `instances`, `capacity`, `serviceMs`, `serviceCv`, `queueLimit`                                     |
+| Cache              | `cache`        | Legacy `hitRate`; opt-in `cacheReadPolicy`, `cacheWritePolicy`, `readFraction`, `cacheTtlMs`, `cacheInvalidationMs`, `cacheStaleMs`, `flushDelayMs`; shared instance/slot/service/queue controls. |
 | Database           | `db`           | `readFraction`, `instances`, `capacity`, `serviceMs`, `serviceCv`, `queueLimit`, `lockMs`, `errorRate`         |
 | Queue              | `queue`        | `queueLimit`, `serviceMs`                                                                                      |
 | Worker             | `worker`       | `instances`, `capacity`, `serviceMs`, `serviceCv`, `errorRate`                                                 |
@@ -107,7 +107,7 @@ derived headroom and component-specific live statistics remain available.
 
 ### Complete simulator catalog
 
-**Examples (24):** `single-server`, `load-balanced`, `cache-aside`,
+**Examples (25, including one personal addition):** `cache-policies`, `single-server`, `load-balanced`, `cache-aside`,
 `async-workers`, `retry-storm`, `cdn-origin`, `rate-limited-api`,
 `circuit-breaker`, `read-replicas`, `sharded-database`, `autoscaling-service`,
 `multi-region`, `full-stack`, `specialised-stores`, `event-driven`,
@@ -208,6 +208,68 @@ dependency is absent. The existing Playwright-based complete interview smoke
 provides the compiled-site alternative.
 
 ## Deliberate limits and remaining hosted gaps
+
+### Personal cache-policy extension
+
+The primary event simulator now adds **Cache policies and freshness**
+(`?example=cache-policies`) without changing legacy cache or Write-behind
+designs. `src/sim/behaviour-cache.ts` and `cache-policies.test.ts` cover:
+
+- Cache-aside uses the API-to-database edge for misses; read-through uses
+  cache-to-database. The direct API-to-that-database fanout is suppressed, so
+  a hit performs no database work and a miss makes one call. Unrelated API
+  dependencies are retained.
+- Read/write classification remains the same throughout the backing request.
+  Writes are not counted as cache read misses. Write-through waits for a
+  database response and updates memory; write-around writes the database
+  without populating memory and lets invalidation remove older versions;
+  write-back acknowledges volatile memory and flushes real delayed work.
+- TTL expiry refetches; stale-while-revalidate serves within a bounded expired
+  window while one background read per key runs, then blocks after hard
+  expiry. A failed read does not warm memory. Failed refreshes and flushes
+  are surfaced; crash/recovery cannot resurrect a destroyed pending buffer.
+- Database commits, including writes through a separate API, advance actual
+  per-key versions. Clean hits are compared with those versions. Metrics
+  show read hit/miss and stale rates, clean-hit freshness, retained-key lag,
+  refresh outcomes, dirty reads/writes, oldest dirty residence and flush
+  outcomes. Dirty buffered reads are excluded from committed freshness.
+- Find the problem names observed stale reads or flush failures. The
+  Inspector distinguishes observed evidence from a static volatile-buffer
+  risk and offers user-reviewed invalidation/write-policy patches, with
+  explicit latency/load/durability tradeoffs. Applying a remedy is not a
+  proof; replay and compare using the existing seeded run/fault schedule.
+- Policy controls survive encoded sharing, file/clipboard/local backups and
+  MCP design validation; malformed policy/timing imports are rejected.
+
+**Model boundaries:** 64 keys, one ordinary Database per managed cache branch,
+no payload values or cache-size eviction, no separate cache-population network
+round trip, no coalescing ordinary cold misses, and no replicated write buffer.
+Invalidation is an idealized notification delay, not packets sent through a
+coherence protocol. A cache crash clears memory; writes already executing at
+the database may still commit. “Flush success” means the database's modeled
+acknowledgment, not an unconditional disk-durability guarantee. The learning
+workbench keeps its distinct aggregate cache model; its preset hit/staleness
+percentages are not relabeled as these per-key measurements.
+
+**Compiled-browser evidence:** `tools/smoke-cache.mjs` exercises all policy
+controls, measured stale versions and a reviewed remedy, actual background
+refresh traffic, dirty-write crash loss, recovery and encoded-share reload.
+A recorded 250 requests/s run changed from 131 stale hits/s and 37% clean-hit
+freshness to 0 stale hits/s and 100% after immediate invalidation; read misses
+increased from 22/s to 41/s, exposing the tradeoff. These are observations of
+that synthetic run, not vendor benchmarks or an identical-workload causal
+comparison. Focused engine cases separately verify deterministic replay,
+single-call misses, delegated-link retries, expiry, independent writers,
+background completion accounting and no resurrection after crash/recovery.
+
+**Subsequent requested stages (not claimed implemented by this cache release):**
+explicit region/zone placement and tunable directional network profiles;
+scoped seeded chaos with baseline/hypothesis and recovery comparison; broader
+evidence-backed diagnosis/remedies; Linux scoped resource budgets and
+Kubernetes scheduling/readiness/resource behavior. Existing manual network
+faults, Region failover, autoscaling and fleet-card rendering remain present.
+No actual infrastructure, Linux tuning, cluster provisioning or paid hosting
+is involved.
 
 1. **Accounts and public leaderboards:** a static site cannot run
    `learning/api/`. Separate Node hosting, OAuth configuration and an explicit

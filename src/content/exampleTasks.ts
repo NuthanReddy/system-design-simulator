@@ -96,6 +96,32 @@ function fmt(n: number): string {
 
 export const EXAMPLE_TASKS: readonly ExampleTask[] = [
   {
+    presetId: 'cache-policies',
+    goal: 'Prove that cache retention, not parallel database work, changes the backing load.',
+    steps: [
+      {
+        text: 'Select Policy Cache and set Cache TTL to 0 milliseconds. Watch the database receive the misses.',
+        field: 'Cache TTL',
+        when: [below(setting('cache', 'cacheTtlMs'), 1), atLeast(served('db'), 100)],
+        holdMs: HOLD,
+        action: { kind: 'select', node: 'cache' },
+        ring: 'db',
+        figs: [fig(served('db'), 'database calls/s')],
+      },
+      {
+        text: 'Set Cache TTL to 5000 milliseconds and watch database calls fall after the keys warm.',
+        field: 'Cache TTL',
+        when: [atLeast(setting('cache', 'cacheTtlMs'), 5000), below(served('db'), 50)],
+        holdMs: HOLD,
+        action: { kind: 'select', node: 'cache' },
+        ring: 'cache',
+        figs: [fig(served('db'), 'database calls/s'), FIG_P99],
+      },
+    ],
+    learned:
+      'Hits bypass the database; writes still reach it. Compare write-around with delayed invalidation to observe stale versions, or crash a write-back cache with dirty writes to expose its durability tradeoff. These choices must be tested, not inferred from a configured hit percentage.',
+  },
+  {
     presetId: 'single-server',
     goal: 'Find the part that fills up first, then give it room.',
     steps: [

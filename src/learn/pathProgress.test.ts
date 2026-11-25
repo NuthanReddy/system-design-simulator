@@ -146,7 +146,8 @@ describe('real outages on the path', () => {
       (s) => s.kind === 'incident',
     );
     expect(stepAfter(outage.id, 'incident')?.id).toBe(outages[1]!.id);
-    expect(stepAfter(outages.at(-1)!.id, 'incident')).toBeNull();
+    expect(stepAfter(outages.at(-1)!.id, 'incident')?.id).toBe('cache-policies');
+    expect(stepAfter('cache-policies', 'example')).toBeNull();
     expect(stepAfter('hold-the-line', 'challenge')?.id).toBe('nothing-looks-busy');
     expect(stepAfter('nothing-looks-busy', 'challenge')?.id).toBe('cache-aside');
     expect(stepAfter('hold-the-line', 'example')).toBeNull();

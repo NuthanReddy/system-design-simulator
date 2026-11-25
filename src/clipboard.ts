@@ -99,6 +99,31 @@ export function isTopology(value: unknown): value is Topology {
     for (const key of ['chargeable', 'idempotencyKeys', 'flushEveryMs', 'freshReads']) {
       if (cfg[key] !== undefined && !Number.isFinite(cfg[key])) return false;
     }
+    if (
+      cfg.cacheReadPolicy !== undefined &&
+      (typeof cfg.cacheReadPolicy !== 'string' ||
+        !['legacy', 'cache-aside', 'read-through', 'stale-while-revalidate'].includes(
+          cfg.cacheReadPolicy,
+        ))
+    )
+      return false;
+    if (
+      cfg.cacheWritePolicy !== undefined &&
+      (typeof cfg.cacheWritePolicy !== 'string' ||
+        !['write-through', 'write-around', 'write-back'].includes(cfg.cacheWritePolicy))
+    )
+      return false;
+    for (const key of ['cacheTtlMs', 'cacheInvalidationMs', 'cacheStaleMs']) {
+      const value = cfg[key];
+      if (
+        value !== undefined &&
+        (typeof value !== 'number' ||
+          !Number.isFinite(value) ||
+          value < 0 ||
+          value > 120000)
+      )
+        return false;
+    }
     if (ids.has(n.id)) return false;
     ids.add(n.id);
   }

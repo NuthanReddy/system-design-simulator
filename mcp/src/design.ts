@@ -61,6 +61,8 @@ const FIELDS: ReadonlySet<string> = new Set(WIRE_FIELDS);
 const WORD_FIELDS: Readonly<Record<string, readonly string[]>> = {
   traffic: TRAFFIC_PATTERNS,
   bulkheadMode: BULKHEAD_MODES,
+  cacheReadPolicy: ['legacy', 'cache-aside', 'read-through', 'stale-while-revalidate'],
+  cacheWritePolicy: ['write-through', 'write-around', 'write-back'],
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {

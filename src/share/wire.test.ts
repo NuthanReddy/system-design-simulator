@@ -160,6 +160,11 @@ describe('protocol tables', () => {
       burstSize: true,
       herdSize: true,
       herdSpreadMs: true,
+      cacheReadPolicy: true,
+      cacheWritePolicy: true,
+      cacheTtlMs: true,
+      cacheInvalidationMs: true,
+      cacheStaleMs: true,
     };
     for (const field of Object.keys(every)) expect(WIRE_FIELDS).toContain(field);
   });
@@ -263,6 +268,8 @@ describe('round trip', () => {
       for (const field of WIRE_FIELDS) {
         if (field === 'traffic') overrides[field] = 'spike';
         else if (field === 'bulkheadMode') overrides[field] = 'wait';
+        else if (field === 'cacheReadPolicy') overrides[field] = 'read-through';
+        else if (field === 'cacheWritePolicy') overrides[field] = 'write-back';
         else overrides[field] = 7 + i + WIRE_FIELDS.indexOf(field) / 1000;
       }
       return node(`${kind}-1`, kind, 0, 0, overrides as Partial<NodeConfig>);

@@ -73,6 +73,17 @@ export interface NodeConfig {
   queueLimit: number;
   /** Fraction of reads answered without hitting downstream. Cache only. */
   hitRate: number;
+  /** Absent/legacy preserves the original independent hit-probability model. */
+  cacheReadPolicy?:
+    'legacy' | 'cache-aside' | 'read-through' | 'stale-while-revalidate';
+  /** Managed-cache write acknowledgment: through waits, around bypasses retention, back buffers volatile writes. */
+  cacheWritePolicy?: 'write-through' | 'write-around' | 'write-back';
+  /** Clean-entry lifetime since successful fill in ms; zero expires immediately. Default 5000. */
+  cacheTtlMs?: number;
+  /** Idealized invalidation notification lag after a committed database version in ms. Default 0. */
+  cacheInvalidationMs?: number;
+  /** Stale-while-revalidate serving window after TTL in ms. Default 5000. */
+  cacheStaleMs?: number;
   /** Probability a request fails on its own (bad deploy, bug). */
   errorRate: number;
   /**
@@ -779,6 +790,18 @@ export interface NodeStats {
   timeoutRate: number;
   /** Cache hit fraction observed this window (cache nodes only). */
   hitRate: number;
+  cacheHitRate?: number;
+  cacheDirtyReadRate?: number;
+  cacheMissRate?: number;
+  cacheStaleRate?: number;
+  cacheFreshFraction?: number;
+  cacheEntries?: number;
+  cacheLagMs?: number;
+  cacheRefreshRate?: number;
+  cacheRefreshFailedRate?: number;
+  cacheDirtyWrites?: number;
+  cacheOldestDirtyMs?: number;
+  cacheOriginConnected?: boolean;
   /** Total completed since sim start. */
   totalCompleted: number;
   /** Total failed since sim start. */

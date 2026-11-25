@@ -10,6 +10,7 @@ import type {
 import { heldShare, sourceBacklogs } from '../components/Canvas';
 import { formatCount, formatMs, formatPct, formatRateBare } from '../components/format';
 import { formatFactor } from '../components/faultWiring';
+import { cacheAdvice } from './cacheAdvice';
 
 /**
  * "Find the problem": which one part is holding the system back right now,
@@ -236,6 +237,17 @@ export function findBottleneck(topology: Topology, snapshot: SimSnapshot): Verdi
         nodeId: r.node.id,
         text: faultText(fault, r, topology, byId),
       };
+  }
+
+  for (const { node, s } of readings) {
+    const advice = cacheAdvice(node, s);
+    if (advice?.evidence === 'observed') {
+      return {
+        kind: 'problem',
+        nodeId: node.id,
+        text: `Observed: ${advice.text} ${advice.remedy} Tradeoff: ${advice.tradeoff}`,
+      };
+    }
   }
 
   // 2. Struggling parts, minus callers that only wait on a struggling callee.

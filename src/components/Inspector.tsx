@@ -34,6 +34,7 @@ import {
 } from '../sim/workload';
 import { defaultConfig } from '../sim/presets';
 import { suggestionFor } from '../content/suggestions';
+import { cacheAdvice } from '../learn/cacheAdvice';
 import { KIND_NAME, KIND_TERM } from './nodeVisuals';
 import {
   NA,
@@ -88,6 +89,11 @@ type Field =
   | 'serviceCv'
   | 'queueLimit'
   | 'hitRate'
+  | 'cacheReadPolicy'
+  | 'cacheWritePolicy'
+  | 'cacheTtlMs'
+  | 'cacheInvalidationMs'
+  | 'cacheStaleMs'
   | 'errorRate'
   | 'timeoutMs'
   | 'retries'
@@ -177,8 +183,24 @@ const FIELDS_BY_KIND: Record<NodeKind, Field[]> = {
     'timeoutMs',
     'retries',
   ],
-  // Only the cache has a hit rate. That single knob is the interesting one.
-  cache: ['hitRate', 'instances', 'capacity', 'serviceMs', 'serviceCv', 'queueLimit'],
+  // Legacy designs retain their probabilistic model; managed policies opt in.
+  cache: [
+    'cacheReadPolicy',
+    'cacheWritePolicy',
+    'readFraction',
+    'cacheTtlMs',
+    'cacheInvalidationMs',
+    'cacheStaleMs',
+    'flushDelayMs',
+    'timeoutMs',
+    'retries',
+    'hitRate',
+    'instances',
+    'capacity',
+    'serviceMs',
+    'serviceCv',
+    'queueLimit',
+  ],
   // A database is slots, service time, and the write lock: the read/write
   // mix and the per-writer lock wait are what make it more than a service.
   db: [
@@ -436,7 +458,7 @@ const KIND_BLURB: Record<NodeKind, string> = {
   service:
     'The workhorse. How many it handles at once, divided by how long each takes, is the ceiling everything else queues behind.',
   cache:
-    'Answers hits without touching downstream. Each cache rolls its own hit chance, independently of the others, so stacking them multiplies misses rather than treating later caches as filters on earlier misses.',
+    'Choose a cache policy to model real per-key hits, TTL and write behavior. Cache-aside uses the API-to-database link on misses; read-through uses the cache-to-database link. The API never calls that same database in parallel. Connect exactly one backing Database; other dependencies still run. In Legacy mode: Each cache rolls its own hit chance, independently of the others, rather than treating later caches as filters on earlier misses.',
   db: 'Works on a few requests at once. When they are all busy, the rest wait in line here.',
   queue:
     'A buffer. Depth is the whole story: it absorbs bursts up to the limit, then turns work away.',
@@ -625,6 +647,29 @@ const SHAPE_FIELDS: Partial<Record<Field, ReadonlySet<string>>> = {
 /** This kind's fields, less the ones the node's traffic shape does not read. */
 function shownFields(kind: NodeKind, config: NodeConfig): readonly Field[] {
   const fields = FIELDS_BY_KIND[kind];
+  if (kind === 'cache') {
+    const managed = config.cacheReadPolicy && config.cacheReadPolicy !== 'legacy';
+    return fields.filter((field) => {
+      if (field === 'cacheReadPolicy') return true;
+      if (field === 'hitRate') return !managed;
+      if (
+        [
+          'cacheWritePolicy',
+          'readFraction',
+          'cacheTtlMs',
+          'cacheInvalidationMs',
+          'timeoutMs',
+          'retries',
+        ].includes(field)
+      )
+        return !!managed;
+      if (field === 'cacheStaleMs')
+        return config.cacheReadPolicy === 'stale-while-revalidate';
+      if (field === 'flushDelayMs')
+        return !!managed && config.cacheWritePolicy === 'write-back';
+      return true;
+    });
+  }
   if (kind !== 'client') return fields;
   const shape = config.traffic ?? 'steady';
   return fields.filter((f) => SHAPE_FIELDS[f]?.has(shape) ?? true);
@@ -650,6 +695,11 @@ function contextHint(field: Field, config: NodeConfig): string | undefined {
  * Without these the panel would show 0 for a cycle the engine runs at 60s.
  */
 const ABSENT_FIELD: Partial<Record<Field, number>> = {
+  cacheTtlMs: 5000,
+  cacheInvalidationMs: 0,
+  cacheStaleMs: 5000,
+  flushDelayMs: 200,
+  readFraction: 0.9,
   trafficPeriodS: DEFAULT_TRAFFIC_PERIOD_S,
   burstSize: DEFAULT_BURST_SIZE,
   herdSize: DEFAULT_HERD_SIZE,
@@ -665,6 +715,56 @@ function readChoice(node: SimNode, field: Field, spec: ChoiceSpec): string {
 }
 
 const FIELD_SPECS: Record<Field, FieldSpec> = {
+  cacheReadPolicy: {
+    control: 'choice',
+    label: 'Cache read policy',
+    unit: 'lookup and fallback routing',
+    options: [
+      { value: 'legacy', label: 'Legacy hit probability' },
+      { value: 'cache-aside', label: 'Cache-aside / lazy loading' },
+      { value: 'read-through', label: 'Read-through (cache-through)' },
+      { value: 'stale-while-revalidate', label: 'Stale-while-revalidate' },
+    ],
+    hint: 'Managed modes start cold and fill only after successful database reads. Cache-aside falls back on the API link; read-through and background refresh use the cache link. Connect cache to one Database and keep API connected to both.',
+  },
+  cacheWritePolicy: {
+    control: 'choice',
+    label: 'Cache write policy',
+    unit: 'acknowledgment and consistency',
+    options: [
+      { value: 'write-through', label: 'Write-through: wait for database' },
+      { value: 'write-around', label: 'Write-around: invalidate later' },
+      { value: 'write-back', label: 'Write-back / write-behind: buffer' },
+    ],
+    hint: 'Through waits for the database before updating cache. Around leaves old cache values until invalidation. Back acknowledges memory before flushing: crash the cache to lose unflushed writes.',
+  },
+  cacheTtlMs: {
+    control: 'number',
+    label: 'Cache TTL',
+    unit: 'milliseconds',
+    min: 0,
+    max: 120000,
+    step: 100,
+    hint: 'Age since a successful fill. Zero immediately expires clean entries; stale-while-revalidate may still serve within its stale window. TTL is not a configured hit percentage.',
+  },
+  cacheInvalidationMs: {
+    control: 'number',
+    label: 'Invalidation lag',
+    unit: 'milliseconds',
+    min: 0,
+    max: 60000,
+    step: 100,
+    hint: 'Delay from a committed database write until an older cached version is evicted. Reads in that interval can be measured stale.',
+  },
+  cacheStaleMs: {
+    control: 'number',
+    label: 'Stale serving window',
+    unit: 'milliseconds',
+    min: 0,
+    max: 60000,
+    step: 100,
+    hint: 'After TTL, answer from memory while one real background database read refreshes the key. After this window, block on a miss.',
+  },
   rps: {
     control: 'slider',
     term: 'offered',
@@ -1406,6 +1506,11 @@ const FIELD_GROUPS: { title: string; fields: ReadonlySet<Field> }[] = [
       'herdSpreadMs',
       'keySkew',
       'hitRate',
+      'cacheReadPolicy',
+      'cacheWritePolicy',
+      'cacheTtlMs',
+      'cacheInvalidationMs',
+      'cacheStaleMs',
       'replicaCount',
       'replicationLagMs',
       'readFraction',
@@ -2271,11 +2376,67 @@ function KindStatRows({
   switch (kind) {
     case 'cache':
       return (
-        <StatRow
-          label="Hit rate right now"
-          term="hit-rate"
-          value={formatPct(stats.hitRate)}
-        />
+        <>
+          <StatRow
+            label="Hit rate right now"
+            term="hit-rate"
+            value={formatPct(stats.hitRate)}
+          />
+          {config.cacheReadPolicy && config.cacheReadPolicy !== 'legacy' ? (
+            <>
+              <StatRow label="Read hits" value={formatRate(stats.cacheHitRate)} />
+              <StatRow label="Read misses" value={formatRate(stats.cacheMissRate)} />
+              <StatRow label="Stale hits" value={formatRate(stats.cacheStaleRate)} />
+              <StatRow
+                label="Dirty buffered reads"
+                value={formatRate(stats.cacheDirtyReadRate)}
+              />
+              <StatRow
+                label="Fresh among read hits"
+                value={
+                  stats.cacheFreshFraction === undefined
+                    ? 'no hits yet'
+                    : formatPct(stats.cacheFreshFraction)
+                }
+              />
+              <StatRow label="Cached keys" value={String(stats.cacheEntries ?? 0)} />
+              <StatRow
+                label="Oldest version lag"
+                value={formatMs(stats.cacheLagMs ?? 0)}
+              />
+              <StatRow
+                label="Background refreshes"
+                value={formatRate(stats.cacheRefreshRate)}
+              />
+              <StatRow
+                label="Failed refreshes"
+                value={formatRate(stats.cacheRefreshFailedRate)}
+              />
+              <StatRow
+                label="Dirty buffered writes"
+                value={String(stats.cacheDirtyWrites ?? 0)}
+              />
+              <StatRow
+                label="Oldest dirty write"
+                value={formatMs(stats.cacheOldestDirtyMs ?? 0)}
+              />
+              <StatRow label="Database flushes" value={formatRate(stats.flushedRate)} />
+              <StatRow label="Failed flushes" value={formatRate(stats.flushFailRate)} />
+              {stats.cacheOriginConnected === false ? (
+                <p className="ins-empty">
+                  No unique backing Database. Connect cache to one Database; cache-aside
+                  can also use its API's direct Database link.
+                </p>
+              ) : null}
+              <p className="ins-empty">
+                Freshness compares actual simulated versions across 64 keys, excluding
+                dirty buffered reads. Lag is time since the first observed newer
+                database commit for the oldest retained stale key. Dirty writes are
+                acknowledged but not durable. Rates use the rolling measurement window.
+              </p>
+            </>
+          ) : null}
+        </>
       );
 
     case 'cdn':
@@ -3472,6 +3633,7 @@ function SingleInspector({
       ? suggestionFor(node.kind)
       : null;
   const lockNote = lockNoteFor(node.kind);
+  const cacheFinding = suggestions ? cacheAdvice(node, stats ?? undefined) : null;
 
   const serviceMsLabel =
     cfg.serviceMs < 10 ? cfg.serviceMs.toFixed(1) : String(Math.round(cfg.serviceMs));
@@ -3727,6 +3889,32 @@ function SingleInspector({
         {suggestion && (
           <Section title="Suggested fix">
             <p className="ins-suggestion">{suggestion}</p>
+          </Section>
+        )}
+        {cacheFinding && (
+          <Section
+            title={
+              cacheFinding.evidence === 'observed'
+                ? 'Observed cache problem and remedy'
+                : 'Cache resilience risk'
+            }
+          >
+            <p className="ins-suggestion">{cacheFinding.text}</p>
+            <p className="ins-hint">{cacheFinding.remedy}</p>
+            <p className="ins-hint">{cacheFinding.tradeoff}</p>
+            {cacheFinding.patch && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => onChange(node.id, cacheFinding.patch!)}
+              >
+                {cacheFinding.action}
+              </button>
+            )}
+            <p className="ins-hint">
+              Only the selected settings change. A remedy is not a proven fix until you
+              replay and compare the results.
+            </p>
           </Section>
         )}
 

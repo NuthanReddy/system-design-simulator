@@ -403,6 +403,7 @@ interface DbExt extends PoolExt {
 }
 
 function dbClassify(ctx: BehaviourCtx, state: NodeStateLike, req: ReqLike): void {
+  if (req.operationClassified) return;
   const isWrite = ctx.roll() >= clamp01(num(state.config.readFraction, 0.9));
   ctx.markWrite(req, isWrite);
 }

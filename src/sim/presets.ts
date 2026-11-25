@@ -3775,6 +3775,53 @@ export const PRESETS: Preset[] = [
     topology: cacheAside,
   },
   {
+    id: 'cache-policies',
+    name: 'Cache policies and freshness',
+    tagline: 'Cache first, database only on a miss',
+    description:
+      'API connects to cache and database. Compare lazy loading, read-through, stale refresh and write policies; measure actual stale versions and dirty writes.',
+    topology: {
+      nodes: [
+        node('client', 'client', 'Client', 40, 200, {
+          rps: 250,
+          timeoutMs: 3000,
+          keySkew: 0.8,
+        }),
+        node('api', 'service', 'API Server', 300, 200, { capacity: 64, serviceMs: 3 }),
+        node('cache', 'cache', 'Policy Cache', 590, 80, {
+          cacheReadPolicy: 'cache-aside',
+          cacheWritePolicy: 'write-through',
+          cacheTtlMs: 5000,
+          cacheInvalidationMs: 1500,
+          cacheStaleMs: 5000,
+          readFraction: 0.9,
+          serviceMs: 2,
+          capacity: 64,
+        }),
+        node('db', 'db', 'Database', 900, 260, {
+          serviceMs: 30,
+          capacity: 32,
+          lockMs: 0,
+        }),
+      ],
+      edges: [
+        edge('client', 'api'),
+        edge('api', 'cache'),
+        edge('api', 'db'),
+        edge('cache', 'db'),
+      ],
+      annotations: [
+        note(
+          'cache-policies-note',
+          40,
+          400,
+          'Design for failure: cache-aside checks memory first, then uses the API-to-database link only on a miss or write. Hits bypass the database. Read-through moves misses to the cache-to-database link. Select Policy Cache to compare write-through, write-around and write-back. TTL and invalidation lag change real per-key freshness. Try a cache crash while writes are dirty; compare latency, stale hits and failed flushes before choosing a remedy.',
+          700,
+        ),
+      ],
+    },
+  },
+  {
     id: 'async-workers',
     name: 'Async workers',
     tagline: 'A backlog that grows faster than it drains',

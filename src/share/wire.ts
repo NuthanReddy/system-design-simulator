@@ -235,7 +235,20 @@ const FIELDS = [
   'burstSize',
   'herdSize',
   'herdSpreadMs',
+  'cacheReadPolicy',
+  'cacheWritePolicy',
+  'cacheTtlMs',
+  'cacheInvalidationMs',
+  'cacheStaleMs',
 ] as const satisfies readonly ConfigField[];
+
+const CACHE_READ_POLICIES = [
+  'legacy',
+  'cache-aside',
+  'read-through',
+  'stale-while-revalidate',
+] as const;
+const CACHE_WRITE_POLICIES = ['write-through', 'write-around', 'write-back'] as const;
 
 /** Every field the wire can carry; exported so a test can prove it is complete. */
 export const WIRE_FIELDS: readonly ConfigField[] = FIELDS;
@@ -774,6 +787,12 @@ function overrides(kind: NodeKind, config: NodeConfig): Map<ConfigField, ConfigV
   for (const field of FIELDS) {
     const v = (config as unknown as Record<string, unknown>)[field];
     if (v === undefined || v === def[field]) continue;
+    if (field === 'cacheReadPolicy' || field === 'cacheWritePolicy') {
+      const options: readonly string[] =
+        field === 'cacheReadPolicy' ? CACHE_READ_POLICIES : CACHE_WRITE_POLICIES;
+      if (typeof v === 'string' && options.includes(v)) out.set(field, v);
+      continue;
+    }
     if (field === 'traffic' || field === 'bulkheadMode') {
       if (
         typeof v === 'string' &&
@@ -791,7 +810,11 @@ function overrides(kind: NodeKind, config: NodeConfig): Map<ConfigField, ConfigV
 }
 
 function packValue(w: Writer, field: ConfigField, v: ConfigValue): void {
-  if (field === 'traffic') {
+  if (field === 'cacheReadPolicy' || field === 'cacheWritePolicy') {
+    const options: readonly string[] =
+      field === 'cacheReadPolicy' ? CACHE_READ_POLICIES : CACHE_WRITE_POLICIES;
+    w.varint(options.indexOf(v as string));
+  } else if (field === 'traffic') {
     w.varint(TRAFFIC_PATTERNS.indexOf(v as (typeof TRAFFIC_PATTERNS)[number]));
   } else if (field === 'bulkheadMode') {
     w.varint(v === 'wait' ? 1 : 0);
@@ -1085,6 +1108,13 @@ function unpackNode(r: Reader, perKind: Map<NodeKind, number>): SimNode {
 }
 
 function unpackValue(r: Reader, field: ConfigField): ConfigValue {
+  if (field === 'cacheReadPolicy' || field === 'cacheWritePolicy') {
+    const options: readonly string[] =
+      field === 'cacheReadPolicy' ? CACHE_READ_POLICIES : CACHE_WRITE_POLICIES;
+    const policy = options[r.varint()];
+    if (policy === undefined) throw new WireError('unknown cache policy');
+    return policy;
+  }
   if (field === 'traffic') {
     const t = TRAFFIC_PATTERNS[r.varint()];
     if (t === undefined) throw new WireError('unknown traffic pattern');

@@ -32,6 +32,7 @@ import { CONTROL_BEHAVIOURS } from './behaviour-control';
 import { STORE_BEHAVIOURS } from './behaviour-store';
 import { MESSAGING_BEHAVIOURS } from './behaviour-messaging';
 import { RESILIENCE_BEHAVIOURS } from './behaviour-resilience';
+import { cache, cacheAwareEdges } from './behaviour-cache';
 
 /**
  * What a node does with a request offered to it.
@@ -59,7 +60,7 @@ export type RouteMode = 'all' | 'one' | 'none';
  * - 'downstream' proceed to routing (the default).
  * - 'complete'   answer right here without calling downstream (a cache hit).
  */
-export type CompleteAction = 'downstream' | 'complete';
+export type CompleteAction = 'downstream' | 'complete' | 'handled';
 
 /** How a node's waiting work is drained when a slot frees up. */
 export type PumpMode =
@@ -168,12 +169,15 @@ export interface ComponentBehaviour {
   onAdmit?(ctx: BehaviourCtx, state: NodeStateLike, req: ReqLike): AdmitAction;
   /** Fan-out policy. Defaults to 'all'. */
   route?(ctx: BehaviourCtx, state: NodeStateLike, req: ReqLike): RouteMode;
+  outgoing?(ctx: BehaviourCtx, state: NodeStateLike, req: ReqLike): readonly SimEdge[];
+  onResolved?(ctx: BehaviourCtx, state: NodeStateLike, req: ReqLike, ok: boolean): void;
+  onCrash?(ctx: BehaviourCtx, state: NodeStateLike): void;
   /** Choose the single edge when route() returned 'one'. */
   pickEdge?(
     ctx: BehaviourCtx,
     state: NodeStateLike,
     req: ReqLike,
-    out: SimEdge[],
+    out: readonly SimEdge[],
   ): SimEdge | null;
   /**
    * FailureReason to use when this kind's pickEdge() declines to choose an
@@ -406,33 +410,7 @@ const service: ComponentBehaviour = {
   buffersForConsumers: false,
   pump: 'own',
   creditsJoinCompletion: true,
-};
-
-/**
- * A read-through cache. On a hit it answers immediately; on a miss it falls
- * through to whatever backs it, or answers anyway if nothing is wired up.
- */
-const cache: ComponentBehaviour = {
-  kind: 'cache',
-  // The slot is the lookup. A miss is the caller's wait (cache-aside).
-  blocksOnDownstream: false,
-  servesRequests: true,
-  instanceModel: 'slots',
-  scaleField: 'instances',
-  generatesLoad: false,
-  pullsFromQueues: false,
-  buffersForConsumers: false,
-  pump: 'own',
-  creditsJoinCompletion: true,
-  onServiceComplete: (ctx, state, _req) => {
-    if (ctx.roll() < clamp01(state.config.hitRate)) {
-      ctx.countHit(state);
-      return 'complete';
-    }
-    ctx.countMiss(state);
-    // No backing store wired up: a miss is still answered, just slowly.
-    return state.out.length === 0 ? 'complete' : 'downstream';
-  },
+  outgoing: cacheAwareEdges,
 };
 
 /* `db` lives in behaviour-store.ts with the other stores: it runs the
@@ -545,7 +523,14 @@ export function flushesLater(node: Pick<SimNode, 'kind' | 'config'>): boolean {
  * a write-behind cache, or a store that answers before its disk has it.
  */
 export function acksBeforeSafe(node: Pick<SimNode, 'kind' | 'config'>): boolean {
-  return behaviourFor(node.kind).acksBeforeSaved === true || flushesLater(node);
+  return (
+    behaviourFor(node.kind).acksBeforeSaved === true ||
+    flushesLater(node) ||
+    (node.kind === 'cache' &&
+      node.config.cacheReadPolicy !== undefined &&
+      node.config.cacheReadPolicy !== 'legacy' &&
+      node.config.cacheWritePolicy === 'write-back')
+  );
 }
 
 export function behaviourFor(kind: NodeKind): ComponentBehaviour {

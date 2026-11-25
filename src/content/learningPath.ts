@@ -187,4 +187,15 @@ export const LEARNING_PATH: readonly PathTrack[] = [
       ),
     ],
   },
+  {
+    id: 'failure-aware-caching',
+    title: 'Failure-aware caching',
+    about: 'Make cache routing, consistency and durability explicit design choices.',
+    steps: [
+      ex(
+        'cache-policies',
+        'Measure cache misses and test freshness and write tradeoffs.',
+      ),
+    ],
+  },
 ];

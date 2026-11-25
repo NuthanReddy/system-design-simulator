@@ -52,6 +52,28 @@ function topo(): Topology {
 }
 
 describe('selectionSubgraph', () => {
+  it('accepts supported cache policies but rejects malformed cache choices and timings', () => {
+    const t = topo();
+    Object.assign(t.nodes[0].config, {
+      cacheReadPolicy: 'stale-while-revalidate',
+      cacheWritePolicy: 'write-back',
+      cacheTtlMs: 2000,
+      cacheInvalidationMs: 100,
+      cacheStaleMs: 1000,
+    });
+    expect(isTopology(t)).toBe(true);
+    for (const invalid of [
+      { cacheReadPolicy: 'magic' },
+      { cacheWritePolicy: {} },
+      { cacheTtlMs: -1 },
+      { cacheInvalidationMs: '10' },
+      { cacheStaleMs: Infinity },
+    ]) {
+      const bad = structuredClone(t);
+      Object.assign(bad.nodes[0].config, invalid);
+      expect(isTopology(bad)).toBe(false);
+    }
+  });
   it('keeps edges between selected nodes and drops boundary-crossing ones', () => {
     const sub = selectionSubgraph(topo(), new Set(['service-1', 'service-2']));
     expect(sub).not.toBeNull();

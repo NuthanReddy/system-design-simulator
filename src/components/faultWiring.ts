@@ -1,4 +1,4 @@
-import { behaviourFor, flushesLater } from '../sim/behaviour';
+import { acksBeforeSafe, behaviourFor, flushesLater } from '../sim/behaviour';
 import type { Engine } from '../sim/engine';
 import { DEFAULT_SEED } from '../sim/seed';
 import type {
@@ -225,7 +225,7 @@ export function restartLosesFor(
     return 'So are the writes it said were saved but had not written to disk yet.';
   }
   const b = behaviourFor(node.kind);
-  if (b.acksBeforeSaved === true) {
+  if (acksBeforeSafe(node)) {
     return 'So are the writes it was holding to save later.';
   }
   if (b.buffersForConsumers) return 'So are the jobs waiting in it.';

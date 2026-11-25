@@ -4,7 +4,12 @@ import {
   flushesLater,
   type ComponentBehaviour,
 } from './behaviour';
-import type { BehaviourCtx, NodeStateLike, ReqLike } from './engine-types';
+import type {
+  BehaviourCtx,
+  NodeStateLike,
+  ReqLike,
+  StoreVersion,
+} from './engine-types';
 import { UnflushedWrites } from './durability';
 import { MinHeap, type Timed } from './heap';
 import { OpLogRecorder, type OpLog, type OpLogOptions } from './oplog';
@@ -312,6 +317,11 @@ interface Req {
   key: number;
   /** True when this request is a write. Classified once, inherited downstream. */
   isWrite: boolean;
+  operationClassified?: boolean;
+  valueVersion?: StoreVersion;
+  relayAcked?: boolean;
+  cacheWriteToken?: number;
+  cacheRefreshToken?: number;
   /**
    * True on a read a replica set sent to its primary because the replicas
    * had not caught up on its key. Never inherited.
@@ -1011,6 +1021,8 @@ export class Engine implements BehaviourCtx {
   private heap = new MinHeap<Ev>();
 
   private nodes = new Map<string, NodeState>();
+  private storeVersions = new Map<string, Map<number, StoreVersion>>();
+  private trackCacheVersions = false;
   private clientIds: string[] = [];
   private nextArrivalGeneration = 1;
   /**
@@ -1374,6 +1386,14 @@ export class Engine implements BehaviourCtx {
   updateNodeConfig(id: string, patch: Partial<NodeConfig>): void {
     const node = this.topology.nodes.find((n) => n.id === id);
     if (node) Object.assign(node.config, patch);
+    if (patch.cacheReadPolicy !== undefined) {
+      this.trackCacheVersions = this.topology.nodes.some(
+        (candidate) =>
+          candidate.kind === 'cache' &&
+          candidate.config.cacheReadPolicy !== undefined &&
+          candidate.config.cacheReadPolicy !== 'legacy',
+      );
+    }
     // A scale value the student typed is a new authored value, so reset() should
     // return to it rather than to the one the preset shipped with, and a later
     // hot swap should treat it as authored, not as a controller write. A value
@@ -2047,6 +2067,7 @@ export class Engine implements BehaviourCtx {
   private killInFlight(nodeId: string): void {
     const state = this.nodes.get(nodeId);
     if (!state) return;
+    state.behaviour.onCrash?.(this, state);
 
     // A store that answered before its writes reached disk loses the ones
     // still in memory. Only here, where the whole store goes down: one
@@ -2064,6 +2085,28 @@ export class Engine implements BehaviourCtx {
     }
     state.waiting.length = 0;
     state.waitHead = 0;
+
+    // Managed cache buffers must not survive a crash merely because the
+    // cache is healed before their delayed SERVICE_DONE event arrives.
+    const buffered: Ev[] = [];
+    this.heap.each((ev) => {
+      if (
+        ev.kind === EV_SERVICE_DONE &&
+        ev.req?.relayAcked &&
+        ev.req.nodeId === nodeId &&
+        ev.req.token === ev.token &&
+        !ev.req.resolved
+      ) {
+        buffered.push(ev);
+      }
+    });
+    buffered.sort((a, b) => a.seq - b.seq);
+    for (const ev of buffered) {
+      const req = ev.req;
+      if (!req || req.resolved || req.token !== ev.token) continue;
+      state.totalFailed++;
+      this.resolve(req, false, 'crashed', this.now - req.enterMs);
+    }
 
     // Threads parked on downstream calls die with the process. Their slots
     // come back now, before anything below can re-enter the engine, and each
@@ -2576,6 +2619,7 @@ export class Engine implements BehaviourCtx {
   reset(): void {
     this.rng = new Rng(this.seed);
     this.now = 0;
+    this.storeVersions.clear();
     this.seq = 0;
     this.nextArrivalGeneration = 1;
     this.heap.clear();
@@ -2668,6 +2712,12 @@ export class Engine implements BehaviourCtx {
   /* ---------------- topology wiring ---------------- */
 
   private buildNodes(previous: Map<string, NodeState> | null): void {
+    this.trackCacheVersions = this.topology.nodes.some(
+      (node) =>
+        node.kind === 'cache' &&
+        node.config.cacheReadPolicy !== undefined &&
+        node.config.cacheReadPolicy !== 'legacy',
+    );
     const next = new Map<string, NodeState>();
     const newClientIds: string[] = [];
     this.clientIds = [];
@@ -3155,14 +3205,14 @@ export class Engine implements BehaviourCtx {
       return;
     }
 
-    const out = state.out;
+    const b = state.behaviour;
+    const out = b.outgoing ? b.outgoing(this, state, req) : state.out;
     if (out.length === 0) {
       // Terminal node: nothing downstream, this call is done.
       this.resolve(req, true, 'error', req.ownMs);
       return;
     }
 
-    const b = state.behaviour;
     const mode = b.route ? b.route(this, state, req) : 'all';
 
     if (mode === 'none') {
@@ -3385,6 +3435,7 @@ export class Engine implements BehaviourCtx {
     child.detached = parent.detached;
     child.key = parent.key;
     child.isWrite = parent.isWrite;
+    child.operationClassified = parent.operationClassified;
     child.rid = parent.rid;
     this.shareBudget(parent, child);
     // A call through a part that picks one way on is named by that part,
@@ -3428,6 +3479,7 @@ export class Engine implements BehaviourCtx {
       twin.detached = child.detached;
       twin.key = child.key;
       twin.isWrite = child.isWrite;
+      twin.operationClassified = child.operationClassified;
       twin.rid = child.rid;
       twin.path = child.path;
       this.shareBudget(parent, twin);
@@ -3728,7 +3780,13 @@ export class Engine implements BehaviourCtx {
    * The behaviour must check its own depth limit BEFORE calling this, the
    * same contract ackAndBuffer has.
    */
-  ackAndRelay(stateLike: NodeStateLike, reqLike: ReqLike, extraDeliveryMs = 0): void {
+  ackAndRelay(
+    stateLike: NodeStateLike,
+    reqLike: ReqLike,
+    extraDeliveryMs = 0,
+    promisesWrite = false,
+    writeToken?: number,
+  ): void {
     const state = stateLike as NodeState;
     const req = reqLike as Req;
     const ackMs = this.serviceTimeFor(state);
@@ -3742,13 +3800,16 @@ export class Engine implements BehaviourCtx {
     msg.detached = true;
     msg.key = req.key;
     msg.isWrite = req.isWrite;
+    msg.operationClassified = req.operationClassified;
+    msg.relayAcked = promisesWrite || undefined;
+    msg.cacheWriteToken = writeToken;
     msg.rid = req.rid;
     msg.path = req.path;
     this.shareBudget(req, msg);
     // A write-behind cache's ack is a promise the write will land. The tally
     // keeps count of the promises so a check can see the ones that are
     // broken behind it, which no client ever hears about.
-    if (state.behaviour.acksBeforeSaved === true) {
+    if (state.behaviour.acksBeforeSaved === true || promisesWrite) {
       const tally = this.tally;
       if (tally !== null) {
         tally.writesAcked++;
@@ -4177,9 +4238,22 @@ export class Engine implements BehaviourCtx {
     }
 
     const hook = state.behaviour.onServiceComplete;
-    if (hook && hook(this, state, req) === 'complete') {
-      this.completeNode(state, req, req.ownMs);
-      return;
+    if (state.behaviour.hasDisk && this.trackCacheVersions) {
+      let versions = this.storeVersions.get(state.id);
+      if (!versions) this.storeVersions.set(state.id, (versions = new Map()));
+      const previous = this.storeVersion(state.id, req.key);
+      req.valueVersion = req.isWrite
+        ? { storeId: state.id, version: previous.version + 1, updatedAtMs: this.now }
+        : previous;
+      if (req.isWrite) versions.set(req.key, req.valueVersion);
+    }
+    if (hook) {
+      const action = hook(this, state, req);
+      if (action === 'handled') return;
+      if (action === 'complete') {
+        this.completeNode(state, req, req.ownMs);
+        return;
+      }
     }
 
     if (state.out.length === 0) {
@@ -4287,6 +4361,8 @@ export class Engine implements BehaviourCtx {
   ): void {
     if (req.resolved) return;
     req.resolved = true;
+    const resolvedAt = this.nodes.get(req.nodeId);
+    resolvedAt?.behaviour.onResolved?.(this, resolvedAt, req, ok);
 
     // A blocking node's slot is held until its request resolves, and every
     // way a request ends comes through here, so this is the one release that
@@ -4462,7 +4538,8 @@ export class Engine implements BehaviourCtx {
       this.childResolved(parent, false, parent.lostReason, 0);
       return;
     }
-    const edge = state.out.find((e) => e.id === parent.retryTarget);
+    const out = state.behaviour.outgoing?.(this, state, parent) ?? state.out;
+    const edge = out.find((e) => e.id === parent.retryTarget);
     if (!edge) {
       this.childResolved(parent, false, 'no-route', 0);
       return;
@@ -4488,6 +4565,7 @@ export class Engine implements BehaviourCtx {
     // three failures' worth of evidence, not zero. Purely observational: it
     // cannot change what happens next.
     const caller = this.nodes.get(parent.nodeId);
+    if (ok && child.valueVersion) parent.valueVersion = child.valueVersion;
     if (caller && caller.behaviour.observesOutcome) {
       caller.behaviour.onDownstreamResult!(this, caller, child, ok, reason);
     }
@@ -4507,7 +4585,10 @@ export class Engine implements BehaviourCtx {
         parent.lostReason === null
       ) {
         // Re-issue the same downstream call. This is real extra load.
-        const edge = parentState.out.find((e) => e.id === child.retryTarget);
+        const out =
+          parentState.behaviour.outgoing?.(this, parentState, parent) ??
+          parentState.out;
+        const edge = out.find((e) => e.id === child.retryTarget);
         if (edge) {
           const attempt = child.attempt + 1;
           // Exponential backoff with jitter. Without a delay a shed (which
@@ -4574,7 +4655,12 @@ export class Engine implements BehaviourCtx {
 
     // A client is credited once, in resolve(), where end-to-end latency is
     // measured. Counting it here as well would double every root request.
-    if (parentState && parentState.behaviour.creditsJoinCompletion) {
+    if (
+      parentState &&
+      parentState.behaviour.creditsJoinCompletion &&
+      !parent.relayAcked &&
+      parent.cacheRefreshToken === undefined
+    ) {
       parentState.completions.add(this.now, 1);
       parentState.totalCompleted++;
       parentState.latency.add(this.now, total);
@@ -4939,7 +5025,32 @@ export class Engine implements BehaviourCtx {
   }
 
   markWrite(reqLike: ReqLike, isWrite: boolean): void {
+    if (reqLike.operationClassified) return;
     (reqLike as Req).isWrite = isWrite;
+  }
+
+  classifyOperation(reqLike: ReqLike, isWrite: boolean): void {
+    const req = reqLike as Req;
+    req.isWrite = isWrite;
+    req.operationClassified = true;
+  }
+
+  nodeState(nodeId: string): NodeStateLike | undefined {
+    return this.nodes.get(nodeId);
+  }
+
+  storeVersion(nodeId: string, key: number): StoreVersion {
+    return (
+      this.storeVersions.get(nodeId)?.get(key) ?? {
+        storeId: nodeId,
+        version: 0,
+        updatedAtMs: 0,
+      }
+    );
+  }
+
+  setValueVersion(reqLike: ReqLike, version: StoreVersion): void {
+    (reqLike as Req).valueVersion = version;
   }
 
   markFromPrimary(reqLike: ReqLike): void {
@@ -4974,6 +5085,7 @@ export class Engine implements BehaviourCtx {
     edge: SimEdge,
     key: number,
     fromLike?: ReqLike,
+    cacheRefreshToken?: number,
   ): boolean {
     const state = stateLike as NodeState;
     const from = fromLike as Req | undefined;
@@ -4996,6 +5108,8 @@ export class Engine implements BehaviourCtx {
     }
     msg.detached = true;
     msg.key = ((Math.floor(key) % KEYSPACE) + KEYSPACE) % KEYSPACE;
+    msg.operationClassified = from?.operationClassified;
+    msg.cacheRefreshToken = cacheRefreshToken;
     // A message of its own, so a request of its own.
     msg.rid = ++this.ridSeq;
     msg.path = 0;
@@ -5339,6 +5453,11 @@ export class Engine implements BehaviourCtx {
       pooled.replyLost = false;
       pooled.key = 0;
       pooled.isWrite = false;
+      pooled.operationClassified = undefined;
+      pooled.valueVersion = undefined;
+      pooled.relayAcked = undefined;
+      pooled.cacheWriteToken = undefined;
+      pooled.cacheRefreshToken = undefined;
       pooled.fromPrimary = false;
       pooled.rid = 0;
       pooled.path = 0;

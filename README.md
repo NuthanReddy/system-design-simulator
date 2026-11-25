@@ -12,12 +12,42 @@ replacing either simulation engine.
 
 | Workbench         | Features                                                                                                                                                                                                                                                                                                                   |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Simulator         | 33 simulated component types, notes/sections, editable connections, individual-request discrete-event simulation, latency/goodput/error charts, load and failure experiments, 24 examples, 18 challenges, 6 incident stories, a 48-step learning path and 119 glossary entries.                                            |
+| Simulator         | 33 simulated component types, notes/sections, editable connections, individual-request discrete-event simulation, latency/goodput/error charts, load and failure experiments, 25 examples, 18 challenges, 6 incident stories, a 49-step learning path and 119 glossary entries.                                            |
 | System Design Lab | 99 building blocks, 82 practice problems across 15 industries, 41 lessons, 93 measured reference designs, guided clarification/estimation/drawing, traffic-day simulation, daily challenges, sandbox, timed Medium/Hard interviews, evidence-based defense, cost/reliability/latency/data-safety scoring and study guides. |
 | Personal workflow | Browser-local progress and saved designs, supported URL sharing and file backups, presentation mode, keyboard controls, accessibility/motion/sound settings, and navigation between the workbenches.                                                                                                                       |
 
 See [FEATURE-PARITY.md](FEATURE-PARITY.md) for the full feature audit,
 component-specific controls, source locations, verification evidence and gaps.
+
+## Design and test cache policies
+
+Open [Cache policies and freshness](https://nuthanreddy.github.io/system-design-simulator/?example=cache-policies).
+The API connects to both cache and database, but the managed cache owns that
+database branch: hits skip the database and misses make one backing call, not a
+second parallel API call. Other API dependencies still fan out.
+
+Select **Policy Cache** to choose cache-aside/lazy loading, read-through
+("cache-through"), or stale-while-revalidate, independently of write-through,
+write-around or write-back/write-behind. TTL, invalidation lag, stale window,
+read fraction and flush residence change actual routing, version visibility
+and acknowledgments. The legacy probabilistic cache and original Write-behind
+component remain compatible with existing designs.
+
+Compare measured hits/misses, stale committed versions, freshness among clean
+hits, background refreshes, dirty writes, flush failures and lag in milliseconds.
+**Find the problem** and the cache Inspector explain observed freshness/write
+failures separately from static durability risks, with explicit, user-applied
+remedies and their tradeoffs. Replaying a remedy is necessary; a suggestion is
+not proof that an arbitrary architecture is correct.
+
+This is a 64-key educational version model, not a payload store or distributed
+coherence protocol. Cache-aside uses the API-to-database link; read-through and
+background refresh use the cache-to-database link. Connect one cache to one
+ordinary Database; a separate cache-population network round trip, cache
+eviction/capacity in bytes, coalescing ordinary cold misses, and replicated
+write buffers are not modeled. Invalidation notification is an idealized
+configured lag; network faults affect actual database/refresh calls, not that
+notification. Dirty reads are shown separately, not called fresh durable data.
 
 **Hosted-service limitations:** GitHub Pages serves static files, not APIs.
 Cross-device account sync, OAuth sign-in, public leaderboards and encrypted short
@@ -73,6 +103,7 @@ With the production preview running and Microsoft Edge installed:
 
 ```powershell
 bun run smoke:site
+bun run smoke:cache
 ```
 
 The smoke harness uses existing Playwright tooling and an isolated browser

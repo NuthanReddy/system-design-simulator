@@ -8,6 +8,12 @@
  */
 import type { FailureReason, NodeConfig, NodeKind, SimEdge } from './types';
 
+export interface StoreVersion {
+  storeId: string;
+  version: number;
+  updatedAtMs: number;
+}
+
 /** The engine's per-node runtime state, as far as a behaviour may see it. */
 export interface NodeStateLike {
   readonly id: string;
@@ -63,6 +69,12 @@ export interface ReqLike {
    * inherited downstream, so a later node sees the same classification.
    */
   readonly isWrite: boolean;
+  readonly operationClassified?: boolean;
+  readonly relayAcked?: boolean;
+  readonly cacheWriteToken?: number;
+  readonly cacheRefreshToken?: number;
+  readonly valueVersion?: StoreVersion;
+  readonly parent?: ReqLike | null;
   /** True on a read a replica set's primary is serving. See `markFromPrimary`. */
   readonly fromPrimary: boolean;
 }
@@ -77,6 +89,10 @@ export interface ReqLike {
 export interface BehaviourCtx {
   /** Current simulated time in ms. */
   readonly now: number;
+  nodeState(nodeId: string): NodeStateLike | undefined;
+  storeVersion(nodeId: string, key: number): StoreVersion;
+  setValueVersion(req: ReqLike, version: StoreVersion): void;
+  classifyOperation(req: ReqLike, isWrite: boolean): void;
 
   /**
    * One draw from the deterministic RNG. Behaviours must take draws in a fixed
@@ -117,7 +133,13 @@ export interface BehaviourCtx {
    * write-behind flush interval). The behaviour must check its own depth
    * limit against queueDepth() before calling.
    */
-  ackAndRelay(state: NodeStateLike, req: ReqLike, extraDeliveryMs?: number): void;
+  ackAndRelay(
+    state: NodeStateLike,
+    req: ReqLike,
+    extraDeliveryMs?: number,
+    promisesWrite?: boolean,
+    writeToken?: number,
+  ): void;
 
   /** The shared edge-selection policy: weighted-random, or least-loaded on ties. */
   pickWeightedOrLeastLoaded(out: readonly SimEdge[]): SimEdge | null;
@@ -307,5 +329,6 @@ export interface BehaviourCtx {
     edge: SimEdge,
     key: number,
     from?: ReqLike,
+    cacheRefreshToken?: number,
   ): boolean;
 }
