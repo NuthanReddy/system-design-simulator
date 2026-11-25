@@ -1,0 +1,1398 @@
+/**
+ * Plain-language explanations for every term the interface puts in front of a
+ * student.
+ *
+ * This is the single source of truth for both the hover/focus tooltips and the
+ * glossary panel, so a term is never explained two different ways in two
+ * places.
+ *
+ * House style for an entry, learned from watching people read this app:
+ *   - `short` is what fits in a tooltip header and on a narrow screen. One
+ *     line, no jargon, no trailing period.
+ *   - `why` is the part that actually teaches. A metric a student cannot act
+ *     on is trivia, so say what it tells them and what to do about it.
+ *   - Never define a term using another undefined term. Where one entry leans
+ *     on another, name it in `see` so the reader can follow the thread.
+ *   - Address the reader as "you". Prefer "the slowest 1% of requests" over
+ *     "the 99th percentile of the latency distribution".
+ */
+
+export type GlossaryCategory =
+  'latency' | 'throughput' | 'failure' | 'capacity' | 'component' | 'unit';
+
+export interface GlossaryEntry {
+  /** Stable lookup key. Also the anchor id in the glossary panel. */
+  id: string;
+  /** How the term appears in the interface. */
+  term: string;
+  /** One-line definition. Tooltip header; no trailing period. */
+  short: string;
+  /** Why a student should care. Two or three sentences at most. */
+  why: string;
+  category: GlossaryCategory;
+  /** Ids of related entries, for "see also" links. */
+  see?: string[];
+  /** Extra words that should match this entry when searching. */
+  aliases?: string[];
+  /**
+   * For a component kind: the beginner card the palette and inspector show.
+   * Written for someone who has never met the term, so each line stands on
+   * its own and names a real product they may have heard of.
+   */
+  intro?: KindIntro;
+}
+
+export interface KindIntro {
+  /** What it is, in one plain sentence. */
+  what: string;
+  /** A well-known real-world product that is one of these. */
+  example: string;
+  /** When you would reach for it, as a full sentence. */
+  useWhen: string;
+}
+
+export const GLOSSARY: GlossaryEntry[] = [
+  /* ---- units ---------------------------------------------------------- */
+  {
+    id: 'rps',
+    term: 'RPS',
+    short: 'Requests per second',
+    why: 'How much traffic is arriving. Every system has a point where more requests per second stops meaning more work done and starts meaning longer queues, so this is the dial you turn to find that point.',
+    category: 'unit',
+    aliases: ['requests per second', 'req/s', 'load', 'traffic'],
+    see: ['throughput', 'goodput'],
+  },
+  {
+    id: 'ms',
+    term: 'ms',
+    short: 'Milliseconds, one thousandth of a second',
+    why: 'The unit for how long something took. For scale: 1ms is imperceptible, 100ms feels instant, 1,000ms (one second) is a noticeable wait, and past about 3,000ms most people give up.',
+    category: 'unit',
+    aliases: ['millisecond', 'milliseconds'],
+    see: ['latency'],
+  },
+
+  /* ---- latency -------------------------------------------------------- */
+  {
+    id: 'latency',
+    term: 'Latency',
+    short: 'How long one request takes from start to finish',
+    why: 'Measured here at the client, so it includes every hop, every queue and every retry along the way. It is the number your users actually feel.',
+    category: 'latency',
+    aliases: ['response time', 'delay'],
+    see: ['p50', 'p99', 'queue-time'],
+  },
+  {
+    id: 'percentile',
+    term: 'Percentile',
+    short: 'A ranking, not an average',
+    why: 'Sort every request by how long it took. The 50th percentile is the one in the middle, the 99th is near the slow end. Percentiles are used instead of averages because one very slow request barely moves an average but is a real person waiting.',
+    category: 'latency',
+    aliases: ['percentiles', 'pXX'],
+    see: ['p50', 'p95', 'p99'],
+  },
+  {
+    id: 'p50',
+    term: 'p50',
+    short: 'The typical request: half were faster, half slower',
+    why: 'Also called the median. It tells you what a normal experience looks like, but it deliberately ignores the worst half, so a healthy p50 can hide serious problems.',
+    category: 'latency',
+    aliases: ['median', '50th percentile'],
+    see: ['p99', 'percentile'],
+  },
+  {
+    id: 'p95',
+    term: 'p95',
+    short: 'The slowest 1 in 20 requests',
+    why: 'Sits between the typical case and the worst case. Useful for spotting trouble building before it shows up in p99.',
+    category: 'latency',
+    aliases: ['95th percentile'],
+    see: ['p50', 'p99'],
+  },
+  {
+    id: 'p99',
+    term: 'p99',
+    short: 'The slowest 1 in 100 requests',
+    why: 'The number to watch. It is where overload shows up first: p50 can look perfectly fine while p99 climbs, because queues punish the unlucky requests long before they slow down the typical one. On a busy page made of many requests, almost every user hits their p99 somewhere.',
+    category: 'latency',
+    aliases: ['99th percentile', 'tail latency'],
+    see: ['p50', 'utilisation', 'queue-time'],
+  },
+  {
+    id: 'queue-time',
+    term: 'Queue time',
+    short: 'Time spent waiting for a free slot, not being worked on',
+    why: 'A request that takes 200ms might have been served in 5ms and queued for 195. Under load, most latency is waiting rather than working, which is why adding capacity helps more than making the work itself faster.',
+    category: 'latency',
+    aliases: ['waiting', 'wait time'],
+    see: ['latency', 'utilisation', 'backlog'],
+  },
+
+  /* ---- throughput ----------------------------------------------------- */
+  {
+    id: 'throughput',
+    term: 'Throughput',
+    short: 'Requests finished per second',
+    why: 'Work actually completed, as opposed to work arriving. Once a system is saturated, throughput flattens out no matter how much more traffic you send: that flat line is the system telling you its real limit.',
+    category: 'throughput',
+    aliases: ['completions'],
+    see: ['rps', 'goodput', 'offered'],
+  },
+  {
+    id: 'offered',
+    term: 'Offered',
+    short: 'Traffic arriving, whether or not it succeeds',
+    why: 'Compare it with goodput. The gap between the two lines is the traffic your system is failing to serve.',
+    category: 'throughput',
+    aliases: ['offered load', 'arrival rate'],
+    see: ['goodput', 'dropped'],
+  },
+  {
+    id: 'goodput',
+    term: 'Goodput',
+    short: 'Requests that actually succeeded, per second',
+    why: 'The only throughput number that counts, because a fast error is still an error. A system can look busy while its goodput is zero, which is exactly what a retry storm looks like.',
+    category: 'throughput',
+    aliases: ['successful throughput'],
+    see: ['throughput', 'offered', 'dropped'],
+  },
+  {
+    id: 'traffic-source',
+    term: 'Traffic source',
+    short: 'One group of users, drawn as a client, and what it sends',
+    why: 'The system numbers average every group together, so checkout users failing badly can hide inside a small overall error rate while browsers are fine. Watching each source on its own shows who is actually hurting, and following that source on the canvas shows where.',
+    category: 'throughput',
+    aliases: ['route', 'client', 'per route', 'by user'],
+    see: ['goodput', 'error-rate', 'p99'],
+  },
+  {
+    id: 'traffic-shape',
+    term: 'Traffic shape',
+    short: 'How a client\u2019s load is spread out over time',
+    why: 'Two systems can see the same requests per second and fare very differently, because one gets them evenly and the other in a rush. Size for the shape you will actually see, not only the average.',
+    category: 'throughput',
+    aliases: [
+      'traffic pattern',
+      'load pattern',
+      'ramp',
+      'spike',
+      'diurnal',
+      'daily cycle',
+    ],
+    see: ['bursty-traffic', 'thundering-herd', 'offered'],
+  },
+  {
+    id: 'bursty-traffic',
+    term: 'Bursty traffic',
+    short: 'Requests arriving in clumps instead of one at a time',
+    why: 'The average looks fine, but each clump lands on a queue all at once, so the slowest requests wait much longer. Extra capacity or a longer queue absorbs clumps; the average rate alone will not tell you that you need it.',
+    category: 'throughput',
+    aliases: ['bursty', 'burstiness', 'clumps', 'batched arrivals'],
+    see: ['traffic-shape', 'queue-time', 'p99'],
+  },
+  {
+    id: 'thundering-herd',
+    term: 'Thundering herd',
+    short: 'Many callers hitting a system at the very same moment',
+    why: 'It happens when a popular cache entry expires, a service comes back after a deploy, or every client wakes on the same timer. The average rate can look fine, but no queue can take everyone at once, so many of them fail. Spreading them out with jitter is the usual fix.',
+    category: 'failure',
+    aliases: ['herd', 'stampede', 'cache stampede', 'thundering herd problem'],
+    see: ['jitter', 'queue-limit', 'retry-storm'],
+  },
+  {
+    id: 'jitter',
+    term: 'Jitter',
+    short: 'A small random delay that stops callers acting in lockstep',
+    why: 'If every client retries, reconnects or refreshes at exactly the same moment, they arrive as a herd. Adding a random wait to each one spreads the same work over a window the system can absorb.',
+    category: 'failure',
+    aliases: ['random delay', 'spread', 'backoff jitter'],
+    see: ['thundering-herd', 'retry'],
+  },
+  {
+    id: 'dropped',
+    term: 'Lost',
+    short: 'Requests that arrived but did not succeed',
+    why: 'The gap between offered and goodput. Some were shed on purpose to protect the system, some timed out, some hit errors. The failure breakdown tells you which.',
+    category: 'failure',
+    aliases: ['dropped'],
+    see: ['shed', 'timeout', 'error-rate'],
+  },
+
+  /* ---- failure -------------------------------------------------------- */
+  {
+    id: 'error-rate',
+    term: 'Error rate',
+    short: 'The share of requests that failed',
+    why: 'Counts every kind of failure together. Watch it alongside latency: a system that sheds load keeps latency low and error rate high, while one that queues everything does the opposite.',
+    category: 'failure',
+    aliases: ['errors', 'err'],
+    see: ['dropped', 'shed', 'timeout'],
+  },
+  {
+    id: 'shed',
+    term: 'Turned away',
+    short: 'Refused at once: every slot busy and the line full',
+    why: 'A deliberate defence, not a malfunction. Refusing a request instantly is far cheaper than accepting it, making it wait, and failing anyway, and it keeps the system responsive for everyone else.',
+    category: 'failure',
+    aliases: ['shed', 'load shedding'],
+    see: ['queue-limit', 'rate-limiter'],
+  },
+  {
+    id: 'timeout',
+    term: 'Timeout',
+    short: 'The caller gave up waiting',
+    why: 'The work usually carries on downstream even though nobody is waiting for the answer any more, so the capacity is spent for nothing. That is what makes retry storms so destructive.',
+    category: 'failure',
+    aliases: ['timed out'],
+    see: ['retry', 'retry-storm'],
+  },
+  {
+    id: 'retry',
+    term: 'Retry',
+    short: 'Automatically asking again after a failure',
+    why: 'Helpful when failures are rare and random. Harmful when the system is already overloaded, because retries add load exactly when there is least to spare.',
+    category: 'failure',
+    aliases: ['retries'],
+    see: ['retry-storm', 'timeout', 'breaker'],
+  },
+  {
+    id: 'retry-storm',
+    term: 'Retry storm',
+    short: 'Retries multiplying the overload that caused them',
+    why: 'A slow service causes timeouts, timeouts cause retries, retries add load, which makes it slower still. Systems can collapse to zero goodput this way while looking fully busy.',
+    category: 'failure',
+    see: ['retry', 'timeout', 'breaker'],
+  },
+  {
+    id: 'at-most-once',
+    term: 'At most once',
+    short: 'Something that happens once or not at all, never twice',
+    why: 'A retry after a timeout can charge a card twice, because the first try may still finish after the caller stopped waiting. Payments have to hold this rule even when everything around them is slow.',
+    category: 'failure',
+    aliases: ['double charge', 'charged twice'],
+    see: [
+      'idempotency-key',
+      'retry',
+      'timeout',
+      'duplicate-delivery',
+      'process-pause',
+      'one-way-partition',
+    ],
+  },
+  {
+    id: 'idempotency-key',
+    term: 'Idempotency key',
+    short: 'A label on a request that lets a server spot a repeat',
+    why: 'The client picks it once and sends the same one on every retry. The server remembers each key whose call succeeded, so a retry gets that answer back instead of charging again. A key whose call failed is forgotten so the retry can do the work, so keep the keys where the card is charged. A part in front of it forgets a call that charged and then failed on the way back, and the retry charges again.',
+    category: 'failure',
+    aliases: ['idempotent', 'idempotency', 'dedupe'],
+    see: ['at-most-once', 'retry', 'duplicate-delivery'],
+  },
+  {
+    id: 'duplicate-delivery',
+    term: 'Duplicate delivery',
+    short: 'The network hands the same request over twice',
+    why: 'A link that resends what it thinks was lost can deliver one request twice, with no retry anywhere in your code. The second copy does the work again, so a payment is charged twice unless the part that charges spots the repeat by its idempotency key.',
+    category: 'failure',
+    aliases: ['delivered twice', 'duplicate request', 'sent twice'],
+    see: ['at-most-once', 'idempotency-key', 'packet-loss'],
+  },
+  {
+    id: 'process-pause',
+    term: 'Process pause',
+    short: 'A process that stops for a moment and then carries on',
+    why: 'A long garbage collection, or a machine that is briefly starved, can freeze a server for seconds without crashing it. Its callers cannot tell it apart from a dead one, so their timeouts fire and they send the request again. When it wakes up it finishes the first try too, and a payment is charged twice unless the part that charges checks the idempotency key.',
+    category: 'failure',
+    aliases: [
+      'gc pause',
+      'garbage collection pause',
+      'stop the world',
+      'stall',
+      'stalled',
+    ],
+    see: ['timeout', 'retry', 'at-most-once', 'idempotency-key'],
+  },
+  {
+    id: 'one-way-partition',
+    term: 'One-way partition',
+    short: 'Requests get through, answers do not',
+    why: 'A link can fail in one direction only. The far end gets the request and does the work, but the answer never comes back, so the caller only learns anything when its timeout gives up. A retry then does the work a second time. A caller with no timeout waits for good.',
+    category: 'failure',
+    aliases: ['lost reply', 'lost answer', 'asymmetric partition', 'cut answers'],
+    see: ['timeout', 'retry', 'at-most-once', 'duplicate-delivery'],
+  },
+  {
+    id: 'acknowledged-write',
+    term: 'Acknowledged write',
+    short: 'A write the caller was told was saved',
+    why: 'Once you tell a user their change is saved, losing it is a broken promise, not a slow request. Where the system says saved decides what a crash can take away.',
+    category: 'failure',
+    aliases: ['acked write', 'confirmed write'],
+    see: ['lost-write', 'writebehind'],
+  },
+  {
+    id: 'lost-write',
+    term: 'Lost write',
+    short: 'An acknowledged write that never reached storage',
+    why: 'A write-behind cache says saved before it saves, and so does a database that puts writes on disk after it answers, so a crash in between loses work the user thinks is safe. Nothing on screen fails when it happens, which is why it has to be checked.',
+    category: 'failure',
+    aliases: ['lost acknowledged write', 'data loss'],
+    see: ['acknowledged-write', 'writebehind', 'dirty-write', 'durability'],
+  },
+  {
+    id: 'durability',
+    term: 'Durability',
+    short: 'Whether a saved write survives a crash',
+    why: 'A database can answer as soon as a write is in memory and put it on disk a moment later. That is quicker to answer, but a crash or restart in that moment loses writes the user was told were saved. Writing to disk before answering closes the gap.',
+    category: 'failure',
+    aliases: ['fsync', 'flush to disk', 'write to disk'],
+    see: ['acknowledged-write', 'lost-write'],
+  },
+  {
+    id: 'read-your-writes',
+    term: 'Read your writes',
+    short: 'After you save something, your next read shows it',
+    why: 'A replica that is behind can show you the old version of what you just changed, which looks to the user like the save did not work. One fix is to send a read to the primary while the replicas are behind on that record. The primary has every write, and it takes on that extra work.',
+    category: 'failure',
+    aliases: ['read-after-write', 'read from the primary'],
+    see: ['stale-read', 'replication-lag'],
+  },
+
+  /* ---- capacity ------------------------------------------------------- */
+  {
+    id: 'utilisation',
+    term: 'Utilisation',
+    short: 'How much of a component’s capacity is in use',
+    why: 'The single best early warning. Waiting time rises gently up to about 70%, then sharply, and becomes unbounded as it approaches 100%. A component at 95% is not "nearly fine". It is about to fall over.',
+    category: 'capacity',
+    aliases: ['util', 'usage'],
+    see: ['capacity', 'p99', 'queue-time'],
+  },
+  {
+    id: 'capacity',
+    term: 'Slots',
+    short: 'How many requests a component can work on at once',
+    why: 'Think of it as the number of checkout tills open; each one is a slot. Anything beyond that waits in line. Capacity times (1000 ÷ service time) gives the most requests per second a component can possibly handle.',
+    category: 'capacity',
+    aliases: ['capacity', 'concurrency'],
+    see: ['service-time', 'utilisation', 'instances'],
+  },
+  {
+    id: 'service-time',
+    term: 'Service time',
+    short: 'How long the component takes to do the work itself',
+    why: 'Excludes any queueing. It is the best case for that component: a request can never be faster than this, and under load it will be much slower.',
+    category: 'capacity',
+    aliases: ['processing time'],
+    see: ['capacity', 'queue-time'],
+  },
+  {
+    id: 'backlog',
+    term: 'Backlog',
+    short: 'Work piled up waiting to be processed',
+    why: 'A backlog that keeps growing means arrivals are outpacing the workers, and it will never recover on its own. A backlog that spikes and drains is a system absorbing a burst, which is what queues are for.',
+    category: 'capacity',
+    aliases: ['queue depth', 'depth'],
+    see: ['queue-limit', 'queue-time'],
+  },
+  {
+    id: 'queue-limit',
+    term: 'Queue limit',
+    short: 'The longest the waiting line is allowed to get',
+    why: 'Once it is full, new requests are shed instead of queued. Setting it is a real trade-off: a long queue absorbs bursts but makes waits longer, while a short one fails fast and stays responsive.',
+    category: 'capacity',
+    see: ['backlog', 'shed'],
+  },
+  {
+    id: 'instances',
+    term: 'Instances',
+    short: 'How many copies of a component are running',
+    why: 'Scaling out means running more copies. Doubling instances roughly doubles the work you can do, right up until a shared dependency further down becomes the new bottleneck.',
+    category: 'capacity',
+    aliases: ['replicas', 'copies', 'machines'],
+    see: ['capacity', 'autoscaler', 'bottleneck'],
+  },
+  {
+    id: 'bottleneck',
+    term: 'Bottleneck',
+    short: 'The one component that limits the whole system',
+    why: 'A system is only as fast as its narrowest point. Adding capacity anywhere else changes nothing, which is why finding the bottleneck matters more than optimising everything.',
+    category: 'capacity',
+    see: ['utilisation', 'instances'],
+  },
+  {
+    id: 'waiting-on-calls',
+    term: 'Waiting on its calls',
+    short: 'Slots held while a request waits on a component it called',
+    why: 'A server that calls a database keeps the request\u2019s slot for the whole time it waits for the answer, even though it is doing no work. That is how a server can look barely busy with every slot taken: the slow part is further down, and its wait is being held here.',
+    category: 'capacity',
+    aliases: ['waiting on downstream', 'held slots', 'blocked'],
+    see: ['backpressure', 'capacity', 'bottleneck'],
+  },
+  {
+    id: 'backpressure',
+    term: 'Backpressure',
+    short: 'A slow part pushing its wait back onto whoever calls it',
+    why: 'When one component falls behind, everything that calls it waits longer and holds its slots longer, so the callers fill up too, all the way back to your users. The part that looks full is often not the cause. Follow the slots waiting on calls down the chain until you reach the part busy doing real work.',
+    category: 'capacity',
+    aliases: ['back pressure', 'back-pressure', 'blocking'],
+    see: ['waiting-on-calls', 'bottleneck', 'queue'],
+  },
+
+  /* ---- components ----------------------------------------------------- */
+  {
+    id: 'load-balancer',
+    term: 'Load balancer',
+    short: 'Spreads incoming requests across several servers',
+    why: 'Lets you scale out by adding servers. It does not create capacity, though. If every server talks to the same database, that database is still the bottleneck.',
+    category: 'component',
+    intro: {
+      what: 'Spreads incoming requests across several copies of a server.',
+      example: 'AWS Elastic Load Balancing, NGINX or HAProxy.',
+      useWhen:
+        'You run more than one copy of a server and want them to share the work, or to skip a copy that is down.',
+    },
+    aliases: ['lb'],
+    see: ['bottleneck', 'instances'],
+  },
+  {
+    id: 'cache',
+    term: 'Cache',
+    short: 'Remembers recent answers so the work is not repeated',
+    why: 'A hit is answered immediately; a miss costs a full trip to whatever is behind it. For one cache, at 90% the database sees a tenth of the traffic. Each cache rolls that chance independently, so stacking two 80% caches leaves about 4% of traffic for whatever is behind them.',
+    category: 'component',
+    intro: {
+      what: 'Fast memory that keeps recent answers so they do not have to be worked out again.',
+      example: 'Redis or Memcached.',
+      useWhen:
+        'The same data is read again and again, and an answer a few seconds old is fine.',
+    },
+    see: ['hit-rate', 'cdn'],
+  },
+  {
+    id: 'hit-rate',
+    term: 'Hit rate',
+    short: 'The share of requests a cache can answer by itself',
+    why: 'Small changes here have outsized effects. Going from 90% to 80% hit rate on one cache does not add 10% more database load: it doubles it. Each hop rolls independently, so chaining caches multiplies miss chances rather than sharing what the first one missed.',
+    category: 'component',
+    aliases: ['cache hit'],
+    see: ['cache', 'cdn'],
+  },
+  {
+    id: 'cdn',
+    term: 'CDN',
+    short: 'A cache close to your users, in front of everything',
+    why: 'Serves the common requests before they ever reach your servers. The cheapest traffic to handle is traffic your system never sees. Its hit rate is rolled independently of every other cache on the path.',
+    category: 'component',
+    intro: {
+      what: 'A network of servers around the world that keeps copies of your files close to your users.',
+      example: 'Cloudflare or Amazon CloudFront.',
+      useWhen:
+        'Many people load the same images, videos or pages, especially from far away.',
+    },
+    aliases: ['content delivery network', 'edge cache'],
+    see: ['cache', 'hit-rate'],
+  },
+  {
+    id: 'queue',
+    term: 'Queue',
+    short: 'Accepts work now so it can be done later',
+    why: 'The caller gets an answer immediately while the work is buffered for a worker. This is how a system absorbs a spike instead of collapsing under it, but only if the workers eventually catch up.',
+    category: 'component',
+    intro: {
+      what: 'A waiting line for jobs. The sender drops work in and moves on, and something else picks it up later.',
+      example: 'RabbitMQ or Amazon SQS.',
+      useWhen:
+        'The work can happen a little later, like sending an email, or you need to soak up sudden spikes.',
+    },
+    aliases: ['message queue', 'buffer'],
+    see: ['worker', 'backlog', 'async'],
+  },
+  {
+    id: 'async',
+    term: 'Asynchronous',
+    short: 'Answering before the work is finished',
+    why: 'Keeps the user waiting only for an acknowledgement rather than the whole job. The trade-off is that the answer is a promise, and the work can still fail after you have replied.',
+    category: 'component',
+    aliases: ['async', 'background work'],
+    see: ['queue', 'worker'],
+  },
+  {
+    id: 'worker',
+    term: 'Worker',
+    short: 'Processes queued work in the background',
+    why: 'Workers set the drain rate. If they are slower than arrivals, the backlog grows without limit no matter how big the queue is.',
+    category: 'component',
+    intro: {
+      what: 'A background program that takes jobs off a queue and does them, one after another.',
+      example: 'A Celery or Sidekiq worker process.',
+      useWhen:
+        'Paired with a queue, for slow jobs nobody should wait on, like resizing photos.',
+    },
+    see: ['queue', 'backlog'],
+  },
+  {
+    id: 'rate-limiter',
+    term: 'Rate limiter',
+    short: 'Caps how many requests are let through per second',
+    why: 'Protects what is behind it by refusing excess traffic cheaply and immediately. Errors go up, but latency stays flat and the service survives, which is often the better failure.',
+    category: 'component',
+    intro: {
+      what: 'Lets through only a set number of requests per second and refuses the rest straight away.',
+      example: "NGINX's limit_req, or the request limits on the GitHub API.",
+      useWhen:
+        'You need to protect a service from spikes, or stop one user sending far more than their share.',
+    },
+    aliases: ['throttle', 'token bucket', 'rate limit'],
+    see: ['shed', 'burst'],
+  },
+  {
+    id: 'burst',
+    term: 'Burst',
+    short: 'How much traffic can arrive at once before limiting starts',
+    why: 'Lets a rate limiter absorb a short spike without punishing normal, uneven traffic. Real traffic arrives in clumps, not at a steady drip.',
+    category: 'component',
+    see: ['rate-limiter'],
+  },
+  {
+    id: 'breaker',
+    term: 'Circuit breaker',
+    short: 'Stops calling a dependency that is already failing',
+    why: 'When errors pass a threshold it opens and fails instantly without calling downstream, giving the struggling service room to recover. It then lets a few test requests through to check whether it is safe to resume.',
+    category: 'component',
+    intro: {
+      what: 'Stops sending requests to a service that keeps failing, then checks later whether it has recovered.',
+      example: "Resilience4j, or Netflix's Hystrix.",
+      useWhen:
+        'One failing dependency would otherwise make every caller wait on it and fail too.',
+    },
+    aliases: ['circuit breaker', 'breaker', 'open', 'closed', 'half-open'],
+    see: ['retry-storm', 'timeout'],
+  },
+  {
+    id: 'autoscaler',
+    term: 'Autoscaler',
+    short: 'Adds and removes instances to track a utilisation target',
+    why: 'Watches a component and scales it to keep utilisation near a setpoint. New instances take time to start, so capacity always lags load. That is why a sharp spike still hurts even with autoscaling on.',
+    category: 'component',
+    intro: {
+      what: 'Watches how busy a component is and adds or removes copies of it by itself.',
+      example: 'AWS Auto Scaling groups, or the Kubernetes Horizontal Pod Autoscaler.',
+      useWhen:
+        'Traffic rises and falls through the day, and you only want to pay for the machines you need.',
+    },
+    see: ['instances', 'utilisation', 'warmup'],
+  },
+  {
+    id: 'warmup',
+    term: 'Warm-up',
+    short: 'The delay before a new instance can serve traffic',
+    why: 'Machines boot, caches fill, connections open. Scaling up is never instant, and this gap is when the system is most likely to fail.',
+    category: 'component',
+    aliases: ['warmup', 'boot time'],
+    see: ['autoscaler', 'instances'],
+  },
+  {
+    id: 'shard',
+    term: 'Shard',
+    short: 'A slice of the data, held on its own partition',
+    why: 'Splitting data across shards multiplies capacity, as long as traffic spreads evenly. One popular key breaks that assumption: a single shard saturates while the rest sit idle, and the total looks healthy while users see failures.',
+    category: 'component',
+    intro: {
+      what: 'Splits one big set of data into pieces, each on its own machine, chosen by a key such as the user id.',
+      example: 'MongoDB sharding, or Vitess in front of MySQL.',
+      useWhen:
+        'One database machine cannot hold all the data or keep up with the writes, even with replicas.',
+    },
+    aliases: ['sharding', 'partition', 'shards'],
+    see: ['hot-key', 'bottleneck'],
+  },
+  {
+    id: 'hot-key',
+    term: 'Hot key',
+    short: 'One piece of data that far more requests want',
+    why: 'Defeats sharding, because a single key can only live on one shard. Average utilisation stays low while that one shard is on fire.',
+    category: 'component',
+    aliases: ['hotspot', 'hot partition'],
+    see: ['shard', 'zipf'],
+  },
+  {
+    id: 'zipf',
+    term: 'Zipf spread',
+    short: 'A few keys get most requests, a long tail gets the rest',
+    why: 'Real traffic looks like this: a few popular users, products or videos, and many rare ones. The average load can look fine while whatever owns the top key is full. This simulator has only 64 keys, so its tail is much shorter than a real one with millions.',
+    category: 'component',
+    aliases: ['zipf', 'skew', 'key skew', 'key spread', 'power law', 'popular keys'],
+    see: ['hot-key', 'shard'],
+  },
+  {
+    id: 'read-replica',
+    term: 'Read replica',
+    short: 'A copy of the database that serves reads only',
+    why: 'Most workloads read far more than they write, so replicas scale the common case cheaply. The cost is that a replica can be slightly behind the primary.',
+    category: 'component',
+    intro: {
+      what: 'Copies of a database that answer reads, kept up to date from the main copy.',
+      example: 'Read replicas in Amazon RDS, or PostgreSQL streaming replication.',
+      useWhen:
+        'Reads are overloading your database, and a read that is a moment out of date is acceptable.',
+    },
+    aliases: ['replica'],
+    see: ['replication-lag', 'stale-read'],
+  },
+  {
+    id: 'replication-lag',
+    term: 'Replication lag',
+    short: 'How far behind the primary a replica is',
+    why: 'A write takes time to reach the replicas. Read during that window and you get the old value, which is why a user can save a change and then not see it.',
+    category: 'component',
+    see: ['read-replica', 'stale-read'],
+  },
+  {
+    id: 'stale-read',
+    term: 'Stale read',
+    short: 'Getting an out-of-date answer from a replica',
+    why: 'The visible cost of scaling reads. Usually harmless, occasionally serious. Showing a stale balance or an unsaved edit is how this becomes a real bug.',
+    category: 'component',
+    see: ['replication-lag', 'read-replica', 'read-your-writes'],
+  },
+  {
+    id: 'region',
+    term: 'Region',
+    short: 'A separate location your system runs in',
+    why: 'Running in more than one region means one can fail without taking everything down. Failover is not instant, though, and requests arriving mid-switch are still lost.',
+    category: 'component',
+    intro: {
+      what: 'A copy of your system running in another part of the world, so one place failing does not take everything down.',
+      example: 'AWS regions such as us-east-1 and eu-west-1.',
+      useWhen:
+        'The system has to keep working even if a whole data centre or city loses power.',
+    },
+    aliases: ['failover', 'multi-region'],
+    see: ['bottleneck'],
+  },
+  {
+    id: 'client',
+    term: 'Client',
+    short: 'Where the traffic comes from',
+    why: 'Stands in for your users. It is also where end-to-end latency is measured, so the numbers it reports are what a real person would actually experience, including every hop and retry along the way.',
+    category: 'component',
+    intro: {
+      what: 'The people or programs sending requests to your system.',
+      example: 'A web browser loading a page, or a phone app calling your API.',
+      useWhen:
+        'Every design starts with one. It is where traffic comes from and where you read what users actually feel.',
+    },
+    aliases: ['user', 'traffic source'],
+    see: ['rps', 'latency'],
+  },
+  {
+    id: 'service',
+    term: 'Service',
+    short: 'A server that handles requests and calls its dependencies',
+    why: 'The ordinary building block of a system. It waits for every dependency it calls before it can answer, so it is only ever as fast as its slowest one.',
+    category: 'component',
+    intro: {
+      what: 'A program on a server that handles requests, often by calling a database or other services.',
+      example: "The Node.js, Python or Java backend behind an app's API.",
+      useWhen:
+        'You need code that does the real work of a request: checking a login, building a page, placing an order.',
+    },
+    aliases: ['server', 'api', 'application'],
+    see: ['capacity', 'bottleneck', 'instances'],
+  },
+  {
+    id: 'database',
+    term: 'Database',
+    short: 'Stores the data. Usually the first thing to saturate',
+    why: 'Databases are harder to scale than servers: you can add application servers freely, but they all tend to talk to the same database, which is why it so often turns out to be the bottleneck.',
+    category: 'component',
+    intro: {
+      what: 'Stores your data safely on disk and answers questions about it.',
+      example: 'PostgreSQL or MySQL.',
+      useWhen:
+        'You have data that must survive a restart and be looked up later, like users, orders or posts.',
+    },
+    aliases: ['db', 'datastore'],
+    see: ['bottleneck', 'read-replica', 'shard'],
+  },
+
+  {
+    id: 'objectstore',
+    term: 'Object store',
+    short: 'Blob storage: high flat latency, very wide pool',
+    why: 'Stores files and blobs rather than rows. Every request pays a high flat latency, but the pool is so wide that saturating it takes deliberate effort. Keep user-facing reads behind a cache and it is the cheapest storage you have.',
+    category: 'component',
+    intro: {
+      what: 'Stores whole files, like photos and videos, under a name, instead of rows in a table.',
+      example: 'Amazon S3 or Google Cloud Storage.',
+      useWhen:
+        'You need to keep large files cheaply, like user uploads, backups or video.',
+    },
+    aliases: ['blob storage', 's3'],
+    see: ['cache', 'database'],
+  },
+  {
+    id: 'searchindex',
+    term: 'Search index',
+    short: 'Search cluster where writes pay extra and appear late',
+    why: 'Searches are cheap, but each write pays an indexing surcharge and only becomes searchable after a refresh delay. Bulk writes can starve the queries that were never the problem, and a search inside the delay window returns the old result.',
+    category: 'component',
+    intro: {
+      what: 'Finds records by the words inside them, the way a search box does.',
+      example: 'Elasticsearch or OpenSearch.',
+      useWhen:
+        'People need to search text, like products or messages, and a normal database query is too slow.',
+    },
+    aliases: ['search cluster', 'inverted index'],
+    see: ['stale-search', 'database'],
+  },
+  {
+    id: 'timeseriesdb',
+    term: 'Time-series database',
+    short: 'Built for appends; range queries cost hundreds of them',
+    why: 'It swallows appends by the thousand, while a range query scans and aggregates many points at once. A few percent of range queries can dominate the whole store, which is why metrics do not live in your main database.',
+    category: 'component',
+    intro: {
+      what: 'A database for measurements taken over time, like CPU use every second.',
+      example: 'Prometheus, InfluxDB or TimescaleDB.',
+      useWhen:
+        'You collect lots of timestamped numbers, like metrics or sensor readings, and chart them over time.',
+    },
+    aliases: ['tsdb', 'metrics store'],
+    see: ['range-query', 'database'],
+  },
+  {
+    id: 'graphdb',
+    term: 'Graph database',
+    short: 'Stores relationships; deeper queries multiply the work',
+    why: 'Each extra hop of traversal multiplies the edges visited by about three. A friends-of-friends query costs several times a direct lookup, and one more hop multiplies it again, so depth is the knob to watch.',
+    category: 'component',
+    intro: {
+      what: 'Stores things and the links between them, like people and who they follow.',
+      example: 'Neo4j or Amazon Neptune.',
+      useWhen:
+        'Your questions follow connections, like friends of friends or people who bought this also bought.',
+    },
+    see: ['traversal-depth', 'database'],
+  },
+  {
+    id: 'coldstorage',
+    term: 'Cold storage',
+    short: 'The archive tier: cheap to keep, seconds to read',
+    why: 'Retrieval takes seconds per request, and that is its whole identity. It is fine for a trickle of restores fed from a queue and hopeless for anything a user is actively waiting on.',
+    category: 'component',
+    intro: {
+      what: 'Very cheap storage for data you almost never need, which takes a while to get back.',
+      example: 'Amazon S3 Glacier.',
+      useWhen:
+        'You must keep old data, like logs or backups, but rarely read it and can wait when you do.',
+    },
+    aliases: ['archive', 'glacier'],
+    see: ['objectstore', 'queue'],
+  },
+  {
+    id: 'vectordb',
+    term: 'Vector database',
+    short: 'Similarity search over embeddings',
+    why: 'Finds the items most similar to a query rather than exact matches. Cost grows with the size of the index and explodes as recall approaches perfect, so the recall setting is really a latency setting read backwards.',
+    category: 'component',
+    intro: {
+      what: 'Finds items that are similar in meaning, using lists of numbers (embeddings) that describe each item.',
+      example: 'Pinecone, or pgvector in PostgreSQL.',
+      useWhen:
+        'You search by meaning rather than exact words, like finding documents to hand an AI chatbot.',
+    },
+    aliases: ['embedding search', 'ann index'],
+    see: ['recall', 'database'],
+  },
+  {
+    id: 'streambroker',
+    term: 'Stream broker',
+    short: 'A partitioned, replayable log between services',
+    why: 'Producers are acknowledged instantly and each consumer group reads at its own pace, so a slow consumer builds lag instead of slowing anyone else. Partition count, not consumer count, caps how fast a group can drain.',
+    category: 'component',
+    intro: {
+      what: 'Keeps an ordered log of events that many services can read, each at its own pace, and read again later.',
+      example: 'Apache Kafka or Amazon Kinesis.',
+      useWhen:
+        'Several services need the same stream of events, like clicks or orders, and may need to replay old ones.',
+    },
+    aliases: ['kafka', 'event stream', 'log'],
+    see: ['consumer-lag', 'retention', 'queue'],
+  },
+  {
+    id: 'pubsub',
+    term: 'Pub/sub topic',
+    short: 'One publish becomes one delivery per subscriber',
+    why: 'Total load is multiplied by the number of subscribers whether you noticed or not. A slow subscriber fails on its own without delaying the others, which is the point of the decoupling.',
+    category: 'component',
+    intro: {
+      what: 'A topic that hands a copy of each message to every service that signed up for it.',
+      example: 'Google Cloud Pub/Sub or Amazon SNS.',
+      useWhen:
+        'One event, like a new order, should set off several separate things: an email, an invoice, analytics.',
+    },
+    aliases: ['topic', 'publish subscribe'],
+    see: ['fan-out', 'queue'],
+  },
+  {
+    id: 'websocket',
+    term: 'WebSocket gateway',
+    short: 'Holds long-lived connections; the scarce thing is slots',
+    why: 'Capacity here is concurrent connections held open, not requests per second. At 30 new connections a second, each held for 8 seconds, 240 slots are simply occupied, which is why chat systems run out of sockets long before CPU.',
+    category: 'component',
+    intro: {
+      what: 'Keeps a connection open to each user so the server can push messages to them instantly.',
+      example: 'A Socket.IO server, or Amazon API Gateway WebSocket APIs.',
+      useWhen: 'You need live updates, like chat, multiplayer games or live scores.',
+    },
+    aliases: ['websockets', 'socket gateway'],
+    see: ['connection-slot', 'capacity'],
+  },
+  {
+    id: 'apigateway',
+    term: 'API gateway',
+    short: 'The front door: authenticates, rate limits, and routes',
+    why: 'Three kinds of refusal happen here so the backends only ever see traffic worth serving. Watch the split between admitted, throttled, and failed auth to tell an attack from an outage.',
+    category: 'component',
+    intro: {
+      what: 'The single front door to your APIs. It checks who is calling, limits how often, and sends each request to the right service.',
+      example: 'Amazon API Gateway or Kong.',
+      useWhen:
+        'You have several backend services and want logins and limits handled once, in one place.',
+    },
+    aliases: ['gateway', 'front door'],
+    see: ['rate-limiter', 'tokens'],
+  },
+  {
+    id: 'sidecar',
+    term: 'Sidecar proxy',
+    short: 'A proxy beside one service: a tax paid for resilience',
+    why: 'It charges its own service time on every request and pays you back with retries, deadlines, and ejecting an upstream that keeps failing. Put one at every hop and the taxes stack; that is a service mesh.',
+    category: 'component',
+    intro: {
+      what: 'A small proxy, a program that passes requests along, running next to one service and handling its calls: retries, timeouts and routing.',
+      example:
+        'Envoy, which Istio runs beside every service. A setup like that is called a service mesh.',
+      useWhen:
+        "You run many services and want the same retry and timeout rules on every call without changing each service's code.",
+    },
+    aliases: ['service mesh', 'envoy'],
+    see: ['outlier-ejection', 'breaker'],
+  },
+  {
+    id: 'lambda',
+    term: 'Serverless function',
+    short: 'Scales instantly to a cap, with a cold-start penalty',
+    why: 'There is no queue: past the concurrency cap, requests are refused outright. A request that finds no warm instance pays the cold start, so idle periods and sudden bursts are exactly when it is slowest.',
+    category: 'component',
+    intro: {
+      what: 'Your code runs only when a request arrives, with no server for you to look after.',
+      example: 'AWS Lambda or Google Cloud Functions.',
+      useWhen:
+        'Traffic is occasional or spiky and you would rather not keep servers running all day.',
+    },
+    aliases: ['lambda', 'faas', 'function'],
+    see: ['cold-start', 'capacity'],
+  },
+  {
+    id: 'cron',
+    term: 'Cron job',
+    short: 'Fires on a schedule and dumps its whole batch at once',
+    why: 'Between firings it does nothing at all. The database that handles the daytime load falls over at midnight not because traffic grew, but because the whole batch arrived in the same instant.',
+    category: 'component',
+    intro: {
+      what: 'Runs a job by itself at set times, like every night at midnight.',
+      example: 'The Unix cron tool, or Kubernetes CronJobs.',
+      useWhen:
+        'Something must happen on a schedule, like nightly reports, clean-ups or billing.',
+    },
+    aliases: ['scheduled job', 'batch job'],
+    see: ['backlog', 'queue'],
+  },
+  {
+    id: 'bulkhead',
+    term: 'Bulkhead',
+    short: 'Caps calls in flight to the dependency behind it',
+    why: 'When that dependency slows down, the pool fills within one round trip and the excess fails fast here instead of queueing behind a sick service. Watching the pool fill is your earliest warning of a slow dependency.',
+    category: 'component',
+    intro: {
+      what: 'Caps how many calls can wait on one dependency at once, so a slow one cannot tie up everything else.',
+      example:
+        "Resilience4j's Bulkhead, or a separate connection pool for each dependency.",
+      useWhen:
+        'One slow dependency could otherwise use up every slot and take unrelated features down with it.',
+    },
+    aliases: ['concurrency pool'],
+    see: ['breaker', 'timeout'],
+  },
+  {
+    id: 'retryqueue',
+    term: 'Retry queue',
+    short: 'Delivers messages, retries failures, keeps the dead',
+    why: 'It acknowledges the sender instantly, delivers downstream itself, and redelivers failures. Messages that fail every attempt land on the dead letter shelf: counted, not vanished.',
+    category: 'component',
+    intro: {
+      what: 'A queue that keeps trying to deliver each message and sets aside the ones that never get through, in a dead letter queue.',
+      example: 'Amazon SQS with a dead-letter queue.',
+      useWhen:
+        'A message must not be lost even if the receiver is down for a while, like a payment notification.',
+    },
+    aliases: ['delivery queue'],
+    see: ['dead-letter', 'redelivery', 'queue'],
+  },
+  {
+    id: 'transcoder',
+    term: 'Transcoder',
+    short: 'A batch farm where each job takes seconds',
+    why: 'Throughput is boxes times jobs-per-box divided by job time, so size it against arrivals. Undersize it by even 10% and the backlog grows forever, because the deficit is structural rather than a burst.',
+    category: 'component',
+    intro: {
+      what: 'Converts video or audio into other formats and sizes, which takes seconds for each file.',
+      example: 'AWS Elemental MediaConvert, or FFmpeg on a fleet of machines.',
+      useWhen:
+        'People upload video that has to be turned into the sizes and formats players need.',
+    },
+    aliases: ['batch farm', 'encoder'],
+    see: ['worker', 'backlog'],
+  },
+  {
+    id: 'edgecompute',
+    term: 'Edge compute',
+    short: 'A small function running close to the user',
+    why: 'The share of requests it can fully answer never touches your origin; the rest pass through and pay the full path. Unlike a cache hit rate, that share is a property of your code, not your traffic.',
+    category: 'component',
+    intro: {
+      what: 'Runs small pieces of your code on servers near the user, before a request reaches your own servers.',
+      example: 'Cloudflare Workers or AWS Lambda@Edge.',
+      useWhen:
+        'Some requests can be answered without your main servers, like redirects, login checks or picking a language.',
+    },
+    aliases: ['edge function', 'edge worker'],
+    see: ['edge-share', 'cdn'],
+  },
+  {
+    id: 'writebehind',
+    term: 'Write-behind cache',
+    short: 'Acknowledges writes from memory, flushes them later',
+    why: 'The caller sees a one-millisecond write while the store sees the same load smoothed out. Crash it, and every write still in the buffer is lost after being confirmed, which is the trade you are making.',
+    category: 'component',
+    intro: {
+      what: 'A cache that says a write is saved straight away and writes it to the database a little later.',
+      example: 'Redis or Hazelcast used as a write buffer in front of a database.',
+      useWhen:
+        'Writes arrive faster than the database can take them, and losing the last few in a crash is acceptable.',
+    },
+    aliases: ['write buffer', 'write back'],
+    see: ['dirty-write', 'cache'],
+  },
+  {
+    id: 'loadshedder',
+    term: 'Load shedder',
+    short: 'Refuses traffic by priority when tokens run low',
+    why: 'Low-priority traffic must leave a reserve of tokens untouched, so under saturation it is dropped first while the traffic that matters keeps being admitted. Degradation as a policy rather than an accident.',
+    category: 'component',
+    intro: {
+      what: 'When overloaded, turns away the least important requests on purpose so the important ones still get through.',
+      example:
+        "Envoy's overload manager, or the priority-based load shedding Netflix runs on its API gateway.",
+      useWhen:
+        'Under heavy load you would rather drop background or analytics traffic than checkout requests.',
+    },
+    aliases: ['priority shedding', 'triage'],
+    see: ['rate-limiter', 'tokens', 'shed'],
+  },
+
+  /* ---- knobs whose label names a concept, not itself ------------------ */
+  {
+    id: 'service-cv',
+    term: 'How uneven the work is',
+    short: 'Whether every request costs the same, or some cost far more',
+    why: 'A component where every request takes exactly 20ms behaves very differently from one averaging 20ms with occasional 200ms outliers. Unevenness alone makes queues form and pushes up the slowest requests, even with the average unchanged.',
+    category: 'capacity',
+    aliases: ['cv', 'coefficient of variation', 'variance', 'variability', 'uneven'],
+    see: ['service-time', 'p99', 'queue-time'],
+  },
+  {
+    id: 'headroom',
+    term: 'Can keep up with',
+    short: 'How many times the arriving traffic this could take',
+    why: 'The ceiling divided by what is actually arriving. Above 1× it is keeping up, below 1× it cannot, and the component with the smallest number is your bottleneck. This is the fastest way to find one without reading a chart.',
+    category: 'capacity',
+    aliases: ['headroom', 'spare capacity', 'room to spare', 'margin'],
+    see: ['bottleneck', 'capacity', 'utilisation'],
+  },
+  {
+    id: 'read-fraction',
+    term: 'Read share',
+    short: 'How much of the traffic reads rather than writes',
+    why: 'It decides how much a replica can help. At 95% reads, adding replicas scales almost everything; at 50%, half the traffic still lands on the one primary no matter how many replicas you add.',
+    category: 'capacity',
+    aliases: ['read fraction', 'reads', 'read write ratio'],
+    see: ['read-replica', 'database'],
+  },
+  {
+    id: 'target-util',
+    term: 'Utilisation target',
+    short: 'The busyness an autoscaler tries to hold a component at',
+    why: 'Set it low and you pay for idle capacity; set it high and there is no slack left to absorb a spike while new capacity boots. Around 60 to 70% is the usual compromise, and that is not a coincidence: past 70% waiting time climbs sharply.',
+    category: 'capacity',
+    aliases: ['target utilisation', 'setpoint', 'target'],
+    see: ['autoscaler', 'utilisation', 'warmup'],
+  },
+  {
+    id: 'partitions',
+    term: 'Partitions',
+    short: 'The independent lanes a log is split into',
+    why: 'A consumer group takes one message per partition at a time, so partition count, not consumer count, caps how fast a group can drain. Adding consumers beyond the partition count does nothing at all.',
+    category: 'capacity',
+    aliases: ['partition', 'lanes'],
+    see: ['streambroker', 'consumer-lag', 'shard'],
+  },
+  /* ---- metrics the per-kind readouts put on screen -------------------- */
+  {
+    id: 'consumer-lag',
+    term: 'Consumer lag',
+    short: 'How far behind the head of the log a group is',
+    why: 'It grows while a group\u2019s consumers are slower than the producers and drains when they catch up. Lag that keeps growing will eventually cross the retention limit, and then messages are lost to that group.',
+    category: 'capacity',
+    aliases: ['lag'],
+    see: ['streambroker', 'retention', 'backlog'],
+  },
+  {
+    id: 'retention',
+    term: 'Retention',
+    short: 'How far back a log keeps messages',
+    why: 'A consumer group that falls further behind than the retention limit skips ahead, and the skipped messages are gone for it. The producer never notices; only the lagging group pays.',
+    category: 'capacity',
+    see: ['consumer-lag', 'streambroker'],
+  },
+  {
+    id: 'cold-start',
+    term: 'Cold start',
+    short: 'The extra delay when no warm instance is free',
+    why: 'The platform must provision and boot an instance before your function even runs. Short keep-warm times and bursty traffic are the recipe for a high cold-start rate.',
+    category: 'latency',
+    aliases: ['warm start', 'keep-warm'],
+    see: ['lambda', 'latency'],
+  },
+  {
+    id: 'dead-letter',
+    term: 'Dead letter',
+    short: 'A message that failed every delivery attempt',
+    why: 'It is parked on a shelf instead of vanishing, so failures stay countable and replayable. A growing dead letter count means something downstream is persistently broken, not just slow.',
+    category: 'failure',
+    aliases: ['dlq', 'dead letter queue'],
+    see: ['retryqueue', 'redelivery'],
+  },
+  {
+    id: 'redelivery',
+    term: 'Redelivery',
+    short: 'A failed delivery being tried again',
+    why: 'It rises before dead letters do, so it is your early warning. Redeliveries also add load exactly when the downstream is already struggling, which is the retry trade-off in miniature.',
+    category: 'failure',
+    see: ['retry', 'dead-letter'],
+  },
+  {
+    id: 'dirty-write',
+    term: 'Dirty write',
+    short: 'A write acknowledged but not yet saved to the store',
+    why: 'Every dirty write is data the caller believes is safe. A crash of the buffer loses all of them at once, after they were confirmed, which is why the count is worth watching.',
+    category: 'failure',
+    aliases: ['at risk'],
+    see: ['writebehind'],
+  },
+  {
+    id: 'fan-out',
+    term: 'Fan-out',
+    short: 'How many deliveries one publish becomes',
+    why: 'Total load downstream is the publish rate multiplied by the fan-out. Adding a subscriber silently adds a whole copy of the traffic, which is the easiest way to grow load without noticing.',
+    category: 'throughput',
+    aliases: ['amplification', 'fan-out'],
+    see: ['pubsub'],
+  },
+  {
+    id: 'tokens',
+    term: 'Tokens',
+    short: 'The spendable budget inside a rate limiter\u2019s bucket',
+    why: 'One token is spent per admitted request and the bucket refills at the configured rate. An empty bucket is a limiter working hard: everything beyond the refill rate is being refused.',
+    category: 'capacity',
+    aliases: ['token bucket', 'tokens left'],
+    see: ['rate-limiter', 'burst'],
+  },
+  {
+    id: 'connection-slot',
+    term: 'Connection slot',
+    short: 'Room for one held connection on a gateway',
+    why: 'A connection occupies its slot for its whole lifetime, not just while data flows. Held connections settle at connect rate times lifetime, so lifetime matters as much as traffic.',
+    category: 'capacity',
+    aliases: ['concurrent connections', 'conns'],
+    see: ['websocket', 'capacity'],
+  },
+  {
+    id: 'outlier-ejection',
+    term: 'Outlier ejection',
+    short: 'A proxy dropping an upstream that keeps failing',
+    why: 'After enough consecutive failures the proxy stops calling the upstream for a while and fails fast instead. Simpler than a windowed error rate on purpose; this is how sidecar health checking actually works.',
+    category: 'component',
+    aliases: ['ejected', 'outlier detection'],
+    see: ['sidecar', 'breaker'],
+  },
+  {
+    id: 'stale-search',
+    term: 'Stale search',
+    short: 'A search answered from the old index',
+    why: 'A write only becomes searchable after the refresh delay, so a search inside that window cannot see it. The stale rate rises with the delay and with write volume.',
+    category: 'failure',
+    aliases: ['refresh lag'],
+    see: ['searchindex', 'stale-read'],
+  },
+  {
+    id: 'range-query',
+    term: 'Range query',
+    short: 'A query that scans many points at once',
+    why: 'It costs hundreds of appends worth of work, so a small share of range queries can dominate a store sized for pure ingest. Watch the mix, not just the total rate.',
+    category: 'capacity',
+    aliases: ['scan', 'aggregation'],
+    see: ['timeseriesdb'],
+  },
+  {
+    id: 'traversal-depth',
+    term: 'Traversal depth',
+    short: 'How many hops a graph query walks',
+    why: 'Every extra hop multiplies the edges visited by about three. Depth 3 costs roughly nine times depth 1, which is why deep traversals get expensive so fast.',
+    category: 'capacity',
+    aliases: ['hops', 'depth'],
+    see: ['graphdb'],
+  },
+  {
+    id: 'recall',
+    term: 'Recall',
+    short: 'How close to perfect a similarity search must be',
+    why: 'Cost scales with one over one minus recall: the last percent costs more than everything before it. Trading a little recall buys a lot of latency back.',
+    category: 'capacity',
+    see: ['vectordb'],
+  },
+  {
+    id: 'edge-share',
+    term: 'Edge share',
+    short: 'The fraction of requests answered at the edge',
+    why: 'It is a property of your code, not your traffic: raising it is engineering work, not luck. Everything outside the share pays the full trip to the origin.',
+    category: 'capacity',
+    aliases: ['at edge'],
+    see: ['edgecompute', 'cdn'],
+  },
+  {
+    id: 'origin-fetch',
+    term: 'Origin fetch',
+    short: 'A CDN miss travelling to your servers',
+    why: 'The origin fetch rate is the load that actually reaches you; offered minus that is what the CDN absorbed. Small drops in hit rate multiply this number quickly.',
+    category: 'throughput',
+    aliases: ['to origin', 'origin'],
+    see: ['cdn', 'hit-rate'],
+  },
+  {
+    id: 'lock-contention',
+    term: 'Lock contention',
+    short: 'Writes waiting for other writes to finish',
+    why: 'A database protects shared data with locks, so each write entering service waits on the writes already holding them. The wait grows with concurrent writers, not with fleet size; adding instances speeds up reads and does nothing here. When lock wait dominates, the fixes are fewer or faster writes, read replicas, or sharding the data itself.',
+    category: 'capacity',
+    aliases: ['lock wait', 'write lock', 'write contention'],
+    see: ['database', 'read-replica', 'shard'],
+  },
+  {
+    id: 'prefix-ceiling',
+    term: 'Prefix ceiling',
+    short: 'A blob store limit that applies per prefix, not store-wide',
+    why: 'Object storage partitions by key prefix, and each prefix sustains only so many requests per second. A hot prefix gets refused with a slowdown while the rest of the store idles, so the fix is spreading your keys, not buying capacity. This is the S3 503 SlowDown.',
+    category: 'capacity',
+    aliases: ['slowdown', 'per-prefix limit', 'hot prefix'],
+    see: ['objectstore', 'throttled'],
+  },
+  {
+    id: 'rendition',
+    term: 'Rendition',
+    short: 'One output quality produced from one source file',
+    why: 'An encode job produces the whole quality ladder: several output files per input. Storage behind the farm therefore sees the job rate multiplied by the ladder size, and that write amplification, not the upload rate, is what you size the store for.',
+    category: 'throughput',
+    aliases: ['quality ladder', 'bitrate ladder', 'encode output'],
+    see: ['transcoder', 'objectstore'],
+  },
+  {
+    id: 'cpu-budget',
+    term: 'CPU budget',
+    short: 'The hard per-request execution limit of an edge runtime',
+    why: 'Edge platforms kill a request whose code runs past the budget and your traffic falls through to the origin anyway. Push heavier logic outward and the budget starts eating the very share you were trying to answer at the edge, so the measured at-edge share is the honest number, not the share your code claims.',
+    category: 'capacity',
+    aliases: ['cpu cap', 'cpu limit', 'execution limit'],
+    see: ['edgecompute', 'edge-share'],
+  },
+
+  /* ---- failure reasons shown in the breakdown ------------------------- */
+  {
+    id: 'no-route',
+    term: 'No route',
+    short: 'The request had nowhere to go',
+    why: 'A component tried to pass work downstream but nothing was wired to it. Usually a gap in the diagram rather than a capacity problem: check the component has an outgoing connection.',
+    category: 'failure',
+    aliases: ['unrouted'],
+    see: ['dropped'],
+  },
+  {
+    id: 'depth-limit',
+    term: 'Went round in a loop',
+    short: 'The request kept coming back round, so it was stopped',
+    why: 'A safety net for loops. If your components are wired in a circle, a request would travel forever, so it is stopped after 32 hops. A loop with more than one way back makes more calls on every lap, so a request there is also stopped once it has made 256 calls into the loop. Seeing this means your design has a loop: follow the arrows and remove the one that leads back.',
+    category: 'failure',
+    aliases: ['depth', 'hop limit', 'loop'],
+    see: ['no-route'],
+  },
+  {
+    id: 'throttled',
+    term: 'Throttled',
+    short: 'Refused by a rate limiter',
+    why: 'The limiter had no tokens left, so the request was turned away instantly rather than being allowed to pile up. Deliberate protection, not a malfunction.',
+    category: 'failure',
+    see: ['rate-limiter', 'shed', 'burst'],
+  },
+  {
+    id: 'rejected',
+    term: 'Refused (circuit open)',
+    short: 'Refused by an open circuit breaker',
+    why: 'The breaker had already decided the dependency was unhealthy, so it failed immediately without calling it. This is the breaker doing its job: the dependency gets quiet time to recover.',
+    category: 'failure',
+    see: ['breaker', 'retry-storm'],
+  },
+  {
+    id: 'crashed',
+    term: 'Crashed',
+    short: 'The component is down',
+    why: 'Something you knocked over deliberately, or a fault that was injected. Requests that were in flight are lost and new ones fail immediately until it comes back.',
+    category: 'failure',
+    aliases: ['down', 'offline'],
+    see: ['dropped', 'region'],
+  },
+  {
+    id: 'partitioned',
+    term: 'Partitioned',
+    short: 'The connection between two components is cut',
+    why: 'Both components are running fine, but they cannot reach each other. Network partitions are the failure people forget to plan for, because nothing looks broken from either side on its own.',
+    category: 'failure',
+    aliases: ['network partition', 'split'],
+    see: ['crashed', 'region'],
+  },
+  {
+    id: 'packet-loss',
+    term: 'Packet loss',
+    short: 'The connection loses some of the requests sent across it',
+    why: 'Both components are running and the connection is up, but a share of what crosses it never arrives. Retries hide a little loss well, because each try gets a fresh chance, but every retry is extra load on the caller.',
+    category: 'failure',
+    aliases: ['lossy link', 'loss rate'],
+    see: ['partitioned', 'retry-storm'],
+  },
+  {
+    id: 'conn-refused',
+    term: 'Connection refused',
+    short: 'Turned away because every connection slot was held',
+    why: 'The gateway was full of live connections, not busy with requests. More slots, shorter connection lifetimes, or fewer connections are the levers that help.',
+    category: 'failure',
+    aliases: ['conn-refused'],
+    see: ['websocket', 'connection-slot'],
+  },
+  {
+    id: 'unauthorized',
+    term: 'Unauthorized',
+    short: 'Refused by the gateway\u2019s auth check',
+    why: 'The request spent a rate-limit token and then failed authentication. A rising rate here with steady traffic usually means bad credentials in a client, or an attack, rather than overload.',
+    category: 'failure',
+    aliases: ['bad auth', 'auth failure'],
+    see: ['apigateway'],
+  },
+  {
+    id: 'bulkhead-full',
+    term: 'Bulkhead full',
+    short: 'Refused because the concurrency pool was occupied',
+    why: 'Every allowed call to the dependency was already in flight, usually because that dependency slowed down. This failure is protection: the alternative is queueing behind a sick service.',
+    category: 'failure',
+    aliases: ['bulkhead-full', 'pool full'],
+    see: ['bulkhead'],
+  },
+  {
+    id: 'acquire-timeout',
+    term: 'Acquire timeout',
+    short: 'A request waited too long for a connection slot',
+    why: 'The downstream calls still hold every slot, so this request never got to start one. Shortening downstream work, adding slots, or reducing retry pressure can clear it.',
+    category: 'failure',
+    aliases: ['acquire-timeout'],
+    see: ['bulkhead'],
+  },
+  {
+    id: 'deprioritized',
+    term: 'Deprioritized',
+    short: 'Dropped by a load shedder protecting higher priority',
+    why: 'The token bucket was into its reserve, so low-priority traffic was refused first. If high-priority traffic is being dropped too, the protection itself is exhausted.',
+    category: 'failure',
+    aliases: ['deprioritized', 'low priority drop'],
+    see: ['loadshedder', 'shed'],
+  },
+  {
+    id: 'region-down',
+    term: 'Region down',
+    short: 'Lost during a failover between regions',
+    why: 'The active region failed and traffic has not landed on the next one yet. Failover takes time, and requests arriving in that gap have nowhere to go. Failover is never truly free.',
+    category: 'failure',
+    aliases: ['region-down'],
+    see: ['region', 'crashed'],
+  },
+];
+
+/** Fast lookup by id. */
+export const GLOSSARY_BY_ID: ReadonlyMap<string, GlossaryEntry> = new Map(
+  GLOSSARY.map((e) => [e.id, e]),
+);
+
+/**
+ * Search across term, aliases and definition text.
+ *
+ * Ranked so an exact term match always beats an incidental mention in some
+ * other entry's `why` text, which is what makes typing "p99" feel correct
+ * rather than returning six entries that happen to discuss it.
+ */
+export function searchGlossary(query: string): GlossaryEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return GLOSSARY;
+
+  const scored: Array<{ entry: GlossaryEntry; score: number }> = [];
+  for (const entry of GLOSSARY) {
+    const term = entry.term.toLowerCase();
+    const aliases = entry.aliases?.map((a) => a.toLowerCase()) ?? [];
+
+    let score = 0;
+    if (term === q || aliases.includes(q)) score = 100;
+    else if (term.startsWith(q)) score = 80;
+    else if (aliases.some((a) => a.startsWith(q))) score = 70;
+    else if (term.includes(q)) score = 50;
+    else if (aliases.some((a) => a.includes(q))) score = 40;
+    else if (entry.short.toLowerCase().includes(q)) score = 20;
+    else if (entry.why.toLowerCase().includes(q)) score = 10;
+    // "kafka" or "s3" should find the kind even without an alias for it.
+    else if (entry.intro?.example.toLowerCase().includes(q)) score = 5;
+
+    if (score > 0) scored.push({ entry, score });
+  }
+
+  scored.sort((a, b) =>
+    b.score !== a.score ? b.score - a.score : a.entry.term.localeCompare(b.entry.term),
+  );
+  return scored.map((s) => s.entry);
+}
+
+export const CATEGORY_LABEL: Record<GlossaryCategory, string> = {
+  latency: 'Latency',
+  throughput: 'Throughput',
+  failure: 'Failures',
+  capacity: 'Capacity',
+  component: 'Components',
+  unit: 'Units',
+};

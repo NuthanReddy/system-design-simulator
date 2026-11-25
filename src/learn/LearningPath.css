@@ -1,0 +1,278 @@
+/* ==========================================================================
+   The learning path dialog.
+
+   Rides the examples shell (.ex-root, .ex-card, .ex-head). Narrower than the
+   gallery, because this is one column read top to bottom and a row of prose
+   980px wide is not readable.
+   ========================================================================== */
+
+.lp-card {
+  width: min(680px, 100%);
+}
+
+.lp-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 0;
+  margin-right: calc(var(--sp-1) * -1);
+  padding-right: var(--sp-1);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  overscroll-behavior: contain;
+}
+
+/* A count in a sentence: sans, with figures that do not shift as it grows. */
+.lp-progress {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lp-track-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* What makes a step done, for every kind, in primary ink: it is the rule
+   the whole list is counted by, not a footnote. */
+.lp-rules {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-prose);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+/* --------------------------------------------------------------------------
+   Up next
+   -------------------------------------------------------------------------- */
+
+.lp-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--surface-2);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-btn);
+}
+
+.lp-next-label {
+  margin: 0;
+}
+
+.lp-next-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  color: var(--text);
+}
+
+.lp-next-here {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lp-next-learn,
+.lp-all-done {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-prose);
+  color: var(--text-dim);
+  text-wrap: pretty;
+}
+
+.lp-next-rule {
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: var(--lh-prose);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+
+.lp-next-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-2);
+  max-width: 100%;
+}
+
+.lp-next-open {
+  max-width: 100%;
+}
+
+.lp-next-where {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-dim);
+}
+
+/* --------------------------------------------------------------------------
+   Tracks
+   -------------------------------------------------------------------------- */
+
+.lp-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.lp-track-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.lp-track-title {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  color: var(--text);
+}
+
+.lp-track-count {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.lp-track-about {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-dim);
+}
+
+.lp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One step: a mark, the name and what it teaches, and its one button. The
+   row itself is not pressable, so it has no hover. */
+.lp-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: var(--bw) solid transparent;
+  border-radius: var(--r-btn);
+}
+
+/* The step to do next keeps a border, so it can be found again lower down
+   the list; the words for it are in the Up next box. */
+.lp-step[data-next] {
+  border-color: var(--accent);
+}
+
+.lp-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  border: var(--bw) solid var(--border-strong);
+  border-radius: var(--r-pill);
+}
+
+.lp-step[data-status='done'] .lp-mark {
+  color: var(--ok);
+  border-color: var(--ok-mark);
+}
+
+.lp-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.lp-step-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--sp-2);
+  row-gap: 2px;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  color: var(--text);
+}
+
+.lp-kind {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-body);
+  color: var(--text-dim);
+}
+
+/* Where a step stands. A word on a flat tag: no border and no hover, so it
+   never reads as a second button beside the real one. */
+.lp-badge {
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  white-space: nowrap;
+  color: var(--text-dim);
+  border-radius: var(--r-sm);
+}
+
+.lp-badge[data-badge='done'] {
+  padding: 0;
+  color: var(--ok);
+}
+
+.lp-badge[data-badge='current'] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.lp-step-learn {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-prose);
+  color: var(--text-dim);
+  text-wrap: pretty;
+}
+
+.lp-step-go {
+  min-width: 76px;
+}
+
+/* A phone has no room for a third column beside the prose, so the button
+   goes under what the step teaches. */
+@media (max-width: 520px) {
+  .lp-step {
+    grid-template-columns: 24px minmax(0, 1fr);
+    row-gap: var(--sp-2);
+  }
+
+  .lp-step-go {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

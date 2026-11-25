@@ -1,0 +1,329 @@
+/* ==========================================================================
+   The examples gallery.
+
+   Same dialog shell as the shortcuts card, deliberately: a student who has
+   opened one reference already knows how this one behaves. It is wider,
+   because a grid of cards needs the room and the whole reason this left the
+   sidebar is that a rail row could not show what an example teaches.
+   ========================================================================== */
+
+.ex-root {
+  position: fixed;
+  inset: 0;
+  /* Level with the other dialogs, above the tooltip layer at 400 so a tooltip
+     can never float over the card covering its trigger. */
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-5);
+}
+
+.ex-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  cursor: default;
+  animation: ex-scrim-in var(--dur-slow) var(--ease-out);
+}
+
+.ex-root.is-closing .ex-scrim {
+  animation: ex-scrim-out var(--dur-base) var(--ease) forwards;
+}
+
+.ex-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  /* Wider than the shortcuts card: three columns of prose need it, and the
+     cap keeps the measure readable on a very wide monitor. */
+  width: min(980px, 100%);
+  max-height: min(720px, 100%);
+  min-height: 0;
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: var(--bw) solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  animation: ex-card-in var(--dur-slow) var(--ease-out);
+}
+
+.ex-root.is-closing .ex-card {
+  animation: ex-card-out var(--dur-base) var(--ease) forwards;
+}
+
+/* --------------------------------------------------------------------------
+   Header
+   -------------------------------------------------------------------------- */
+
+.ex-head {
+  display: flex;
+  /* Three buttons do not fit beside the title on a phone; they drop to
+     their own row instead of pushing Close off the screen. */
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  /* The banded head every dialog shares: reaches the card's edges, with a
+     hairline under it. */
+  margin: calc(var(--sp-5) * -1) calc(var(--sp-5) * -1) 0;
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+  border-bottom: var(--bw) solid var(--border);
+}
+
+.ex-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex: none;
+  max-width: 100%;
+  gap: var(--sp-2);
+}
+
+.ex-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-num);
+  letter-spacing: var(--tr-lg);
+  color: var(--text);
+}
+
+.ex-sub {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-body);
+  line-height: var(--lh-sm);
+  color: var(--text-dim);
+}
+
+.ex-search {
+  flex: 0 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   The grid
+
+   auto-fill rather than auto-fit: with a search filtered down to one result,
+   auto-fit would stretch that single card the full width of the dialog, which
+   reads as a layout accident. auto-fill keeps every card the same size no
+   matter how many survive the filter.
+   -------------------------------------------------------------------------- */
+
+/* The grid and the incidents under it scroll as one list. */
+.ex-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 0;
+  padding: 0 var(--sp-1) var(--sp-1) 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  overscroll-behavior: contain;
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0 var(--sp-1) var(--sp-1) 0;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  overscroll-behavior: contain;
+}
+
+/* Never squeezed: the list scrolls, its parts keep their height. */
+.ex-scroll > * {
+  flex: none;
+}
+
+.ex-scroll .ex-grid {
+  padding: 0;
+  overflow: visible;
+}
+
+.ex-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--sp-3);
+  text-align: left;
+  background: var(--surface-2);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.ex-item:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.ex-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The loaded example is marked by its border and a word, not by a filled
+   background: a solid accent block behind body text is the one thing that
+   would make the description in this card unreadable. */
+.ex-item[data-active] {
+  border-color: var(--accent);
+}
+
+.ex-item-name {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  color: var(--text);
+}
+
+.ex-item-tagline {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-body);
+  line-height: var(--lh-sm);
+  color: var(--text-dim);
+}
+
+/* The part a rail row had no room for, and the reason this is a gallery. */
+.ex-item-desc {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-body);
+  line-height: var(--lh-prose);
+  color: var(--text-faint);
+  text-wrap: pretty;
+}
+
+/* The loaded example's tag: the shared "this is the one" look, a sentence-
+   case word on the accent-soft fill. */
+.ex-item-active {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  line-height: var(--lh-sm);
+  color: var(--accent-ink);
+}
+
+.ex-empty {
+  margin: 0;
+  padding: var(--sp-5) 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-prose);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+
+@keyframes ex-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ex-card-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes ex-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ex-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* On a phone the card becomes a bottom sheet, the same as Share and
+   Settings. Only the list scrolls. The header wraps its buttons under the
+   title once both no longer fit on one line, so the title never wraps
+   beside them. app-sheet-in / app-sheet-out are declared in App.css. */
+@media (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .ex-root {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .ex-card {
+    width: 100%;
+    max-height: calc(100dvh - var(--sp-7));
+    padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));
+    border-bottom: 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    animation: app-sheet-in var(--dur-base) var(--ease-out);
+  }
+
+  .ex-root.is-closing .ex-card {
+    animation: app-sheet-out var(--dur-base) var(--ease) forwards;
+  }
+
+  .ex-head {
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+
+  .ex-head > :first-child {
+    flex: 1 1 260px;
+  }
+}
+
+/* Durations collapse rather than `animation: none`, because unmount rides
+   animationend and removing the animation outright would strand the dialog
+   mounted forever. */
+@media (prefers-reduced-motion: reduce) {
+  .ex-card,
+  .ex-scrim,
+  .ex-root.is-closing .ex-card,
+  .ex-root.is-closing .ex-scrim {
+    animation-duration: 0.01ms;
+  }
+
+  .ex-item {
+    transition: none;
+  }
+}
+
+/* Focused as a whole on a touch screen instead of its search field. */
+.ex-card:focus {
+  outline: none;
+}

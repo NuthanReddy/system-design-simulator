@@ -1,0 +1,256 @@
+/* Account styles: the top-bar sign-in button and avatar, the small panels, and the Challenge leaderboard. Classes use the ac- prefix. */
+
+.ac-slot { position: relative; display: flex; align-items: center; }
+.ac-slot[hidden] { display: none; }
+
+.ac-signin-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px 0 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-2);
+  font: 500 14px/1 var(--font-ui); cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.ac-signin-btn:hover { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); border-color: var(--border-strong); }
+.ac-signin-btn:active { transform: scale(0.97); }
+.ac-signin-ico { display: inline-flex; width: 20px; height: 20px; }
+.ac-signin-ico svg { width: 100%; height: 100%; }
+
+.ac-me-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; transition: background var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out); }
+.ac-me-btn:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.ac-me-btn:active { transform: scale(0.94); }
+.ac-signin-btn:focus-visible, .ac-me-btn:focus-visible, .ac-provider:focus-visible, .ac-tab:focus-visible, .ac-x:focus-visible, .ac-link:focus-visible, .ac-report:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ac-avatar {
+  --ac-size: 32px;
+  position: relative; display: inline-grid; place-items: center; flex: none; width: var(--ac-size); height: var(--ac-size);
+  border-radius: 50%; overflow: hidden; background: var(--accent-soft); color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.ac-avatar-letter { font: 600 calc(var(--ac-size) * 0.45)/1 var(--font-display); }
+.ac-avatar-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- panels ---------- */
+.ac-pop {
+  position: fixed; top: var(--ac-top, 70px); right: var(--ac-right, 16px); z-index: calc(var(--z-modal) - 1);
+  width: min(336px, calc(100vw - 32px)); padding: 18px 20px 16px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-4); background: var(--surface-solid); color: var(--text);
+  box-shadow: var(--shadow-3); font: 400 14px/1.45 var(--font-ui);
+  transform-origin: top right; animation: ac-pop-in var(--dur-2) var(--ease-out) both;
+}
+.ac-pop, .ac-pop *, .ac-pop *::before, .ac-pop *::after { box-sizing: border-box; }
+:where(.ac-pop) button, :where(.ac-pop) input, :where(.ac-pop) select { font: inherit; color: inherit; }
+:where(.ac-pop) a { color: inherit; text-decoration: none; }
+/* the panels live outside the shell, so its focus ring does not reach their buttons: give them the same one */
+.ac-pop button:focus-visible, .ac-pop a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@keyframes ac-pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+:root[data-motion="reduce"] .ac-pop { animation: ac-fade 100ms linear both; }
+@keyframes ac-fade { from { opacity: 0; } to { opacity: 1; } }
+.ac-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ac-pop-title { margin: 0; font: 600 17px/1.25 var(--font-display); overflow-wrap: anywhere; }
+.ac-x { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); cursor: pointer; }
+.ac-x:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.ac-text { margin: 0 0 14px; color: var(--text-2); }
+.ac-fine { margin: 12px 0 0; font-size: 12.5px; color: var(--text-3); }
+.ac-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 500; text-decoration: none; border-radius: 6px; }
+.ac-link:hover { text-decoration: underline; }
+.ac-err { min-height: 0; margin: 8px 0 0; font-size: 13px; color: var(--bad); }
+.ac-err:empty { display: none; }
+.ac-mini { font-size: 12.5px; color: var(--text-3); }
+
+.ac-providers { display: grid; gap: 10px; justify-items: stretch; }
+.ac-gis { display: flex; justify-content: center; min-height: 44px; align-items: center; }
+.ac-gis-wait { font-size: 13px; color: var(--text-3); }
+/* Google's button page is light; a dark iframe would get an opaque white backdrop around it */
+.ac-gis iframe { color-scheme: light; }
+.ac-provider {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 8px 16px;
+  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-solid); color: var(--text);
+  font: 500 14px/1.2 var(--font-ui); text-decoration: none; cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.ac-provider:hover { background: color-mix(in srgb, var(--text) 5%, var(--surface-solid)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong)); }
+.ac-provider:active { transform: scale(0.985); }
+.ac-provider:disabled { opacity: 0.5; cursor: progress; }
+.ac-provider--test { border-style: dashed; color: var(--text-2); }
+.ac-provider-ico { display: inline-flex; color: var(--text-2); }
+
+.ac-menu { padding-top: 16px; }
+.ac-me { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ac-me-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ac-sync { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--text-2); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.ac-sync .sh-ico { flex: none; margin-top: 1px; color: var(--ok); }
+.ac-sync[data-state="failed"] { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.ac-sync[data-state="failed"] .sh-ico { color: var(--warn); }
+.ac-sync[data-state="syncing"] .sh-ico { color: var(--text-3); }
+.ac-rename { display: grid; gap: 6px; margin-bottom: 12px; }
+.ac-label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.ac-rename-row { display: flex; gap: 8px; }
+.ac-rename-msg { display: flex; align-items: flex-start; gap: 6px; }
+.ac-rename-msg:empty { display: none; }
+.ac-rename-msg .sh-ico { flex: none; margin-top: 2px; }
+.ac-rename-msg[data-state="ok"] { color: var(--ok); }
+.ac-rename-msg[data-state="bad"] { color: var(--bad); }
+/* the field and its Save button share one height and one corner */
+.ac-input { flex: 1; min-width: 0; min-height: 44px; border-radius: 8px; }
+.ac-links { display: flex; flex-wrap: wrap; gap: 16px; margin: 4px 0 14px; font-size: 14px; }
+.ac-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-danger { color: var(--bad); }
+.ac-nudge .ac-text { margin-bottom: 12px; color: var(--text); }
+
+/* ---------- leaderboard ---------- */
+.ac-board[hidden] { display: none; }
+/* the card answers to its own width: beside the scenario on a small laptop it is as narrow as on a phone */
+.ac-board { container-type: inline-size; }
+.ac-board-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+/* the same segmented control as the shell's: a 12px track with 8px buttons */
+.ac-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ac-tab { min-height: 36px; padding: 6px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font: 500 13px/1 var(--font-ui); cursor: pointer; transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out); }
+.ac-tab[aria-selected="true"] { background: var(--surface-solid); color: var(--text); box-shadow: var(--shadow-1); }
+.ac-select { width: 100%; margin-bottom: 10px; }
+.ac-select[hidden] { display: none; }
+.ac-board-note { padding: 10px 0; font-size: 14px; }
+.ac-board-fail { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; color: var(--warn); }
+.ac-board-fail .ac-board-note { padding: 6px 0; }
+.ac-retry { grid-column: 2; justify-self: start; margin-bottom: 4px; }
+/* where scroll bars take room (Windows), both lists keep the same gutter so the "you" row stays under its columns */
+.ac-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 420px; overflow-y: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 30%, transparent) transparent; }
+.ac-rows--you { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-strong); max-height: none; }
+/* fixed tracks, so every row and the "you" row under the list share their columns: rank, avatar, name, stars, score, [report], replay mark.
+   The "you" and "missed targets" tags get a line of their own under the name, as wide as the rest of the row, so they never run into the stars. */
+.ac-row { display: grid; grid-template-columns: 2em 26px minmax(0, 1fr) 44px 3.2em 18px; grid-template-rows: minmax(26px, auto) auto; align-items: center; align-content: center; column-gap: 8px; row-gap: 0; min-height: 40px; padding: 4px 8px; border-radius: 8px; font-size: 14px; }
+.ac-row > .ac-rank { grid-column: 1; grid-row: 1 / span 2; }
+.ac-row > .ac-avatar { grid-column: 2; grid-row: 1 / span 2; }
+.ac-board[data-member="1"] .ac-row { grid-template-columns: 2em 26px minmax(0, 1fr) 44px 3.2em 48px 18px; }
+.ac-row:nth-child(odd) { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.ac-report { justify-self: end; min-height: 32px; padding: 0 4px; border: 0; border-radius: 6px; background: none; color: var(--text-3); font: 400 12px/1 var(--font-ui); cursor: pointer; }
+.ac-report:hover, .ac-report:focus-visible { color: var(--text); text-decoration: underline; }
+.ac-report:disabled { cursor: default; text-decoration: none; color: var(--text-3); }
+.ac-row.is-you { background: var(--accent-soft); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.ac-rank { text-align: right; color: var(--text-2); }
+.ac-name { display: contents; }
+.ac-tags { grid-column: 3 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+/* a long name takes a second line before it is cut */
+.ac-name-text { grid-column: 3; grid-row: 1; min-width: 0; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; line-height: 1.25; }
+.ac-you { flex: none; padding: 0 7px; border-radius: 999px; font-size: 10px; line-height: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.ac-you--miss { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.ac-row-stars { display: inline-flex; gap: 1px; color: var(--warn); }
+.ac-score { text-align: right; font-weight: 600; }
+.ac-ver { display: inline-flex; color: var(--ok); }
+.ac-ver--no { color: var(--text-3); font-size: 12px; justify-content: center; }
+.ac-board-foot { display: grid; gap: 8px; justify-items: start; }
+.ac-join { margin-top: 2px; }
+
+@media (max-width: 520px) {
+  .ac-pop { right: 16px; left: 16px; width: auto; }
+}
+/* a narrow card (a phone, or the side column below about 1100px): no stars and tighter tracks, so the name keeps 110px or more */
+@container (max-width: 379px) {
+  .ac-row { grid-template-columns: 1.7em 26px minmax(0, 1fr) 3em 16px; column-gap: 6px; }
+  .ac-board[data-member="1"] .ac-row { grid-template-columns: 1.7em 26px minmax(0, 1fr) 3em 44px 16px; }
+  .ac-report { padding: 0 3px; }
+  .ac-row-stars { display: none; }
+}
+@supports not (container-type: inline-size) {
+  @media (max-width: 520px) {
+    .ac-row { grid-template-columns: 1.7em 26px minmax(0, 1fr) 3em 16px; column-gap: 6px; }
+    .ac-board[data-member="1"] .ac-row { grid-template-columns: 1.7em 26px minmax(0, 1fr) 3em 44px 16px; }
+    .ac-report { padding: 0 3px; }
+    .ac-row-stars { display: none; }
+  }
+}
+@media (max-width: 380px) {
+  .ac-me-btn { width: 36px; height: 36px; }
+}
+@media (pointer: coarse) {
+  .ac-signin-btn, .ac-me-btn { min-width: 44px; min-height: 44px; }
+  .ac-tab { min-height: 44px; }
+  .ac-x { width: 44px; height: 44px; }
+}
+:root[data-fx="low"] .ac-pop { box-shadow: var(--shadow-2); }
+
+.ac-row-stars.is-none { opacity: 0.3; }
+
+/* ================= Sign-in and account, second pass: one calm card, real provider buttons ================= */
+.ac-signin-btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-solid); color: var(--text); font-weight: 600; font-size: 14px; }
+.ac-signin-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.ac-me-btn { border-radius: 50%; width: 40px; height: 40px; }
+
+.ac-scrim { position: fixed; inset: 0; z-index: calc(var(--z-modal) - 2); background: rgb(6 10 20 / 62%); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: ac-fade 160ms linear both; }
+.ac-pop.ac-pop--modal { top: 50%; left: 50%; right: auto; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; transform: translate(-50%, -50%); animation: ac-modal-in 200ms var(--ease-out) both; }
+@keyframes ac-modal-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+:root[data-motion="reduce"] .ac-pop--modal { animation: ac-fade 100ms linear both; }
+@media (max-width: 520px) { .ac-pop.ac-pop--modal { left: 50%; right: auto; width: calc(100vw - 32px); } }
+
+.ac-card { box-sizing: border-box; width: 100%; padding: 28px 28px 22px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface-solid); color: var(--text); box-shadow: var(--shadow-3); font: 400 15px/1.5 var(--font-ui); }
+.ac-card *, .ac-card *::before, .ac-card *::after { box-sizing: border-box; }
+.ac-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; min-height: 32px; }
+.ac-card-mark { display: inline-flex; }
+.ac-card-title { margin: 0 0 6px; font: 700 22px/1.25 var(--font-display); letter-spacing: -0.01em; }
+.ac-card-lead { margin: 0 0 22px; color: var(--text-2); font-size: 15px; }
+.ac-card--note { padding: 24px; }
+.ac-card--note .ac-card-lead { margin-bottom: 16px; }
+
+.ac-providers { display: grid; gap: 12px; }
+.ac-provider { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 46px; padding: 10px 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-strong); color: var(--text); font: 600 15px/1.2 var(--font-ui); cursor: pointer; text-decoration: none; transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out); }
+.ac-provider:hover { background: color-mix(in srgb, var(--text) 7%, var(--surface-strong)); border-color: var(--text-3); }
+.ac-provider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ac-provider-ico { position: absolute; left: 16px; display: inline-flex; color: var(--text); }
+.ac-provider--google { background: #fff; color: #1f1f1f; border-color: #747775; }
+.ac-provider--google .ac-provider-ico { color: inherit; }
+.ac-provider--google:hover { background: #f2f2f2; border-color: #1f1f1f; }
+.ac-provider--github { background: #24292f; color: #fff; border-color: #24292f; }
+.ac-provider--github .ac-provider-ico { color: #fff; }
+.ac-provider--github:hover { background: #32383f; border-color: #32383f; }
+:root[data-theme="dark"] .ac-provider--github { background: #f0f3f6; color: #1b1f24; border-color: #f0f3f6; }
+:root[data-theme="dark"] .ac-provider--github .ac-provider-ico { color: #1b1f24; }
+:root[data-theme="dark"] .ac-provider--github:hover { background: #fff; border-color: #fff; }
+.ac-gis { min-height: 46px; }
+.ac-gis-wait { font-size: 13px; color: var(--text-2); }
+
+.ac-fine { margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.ac-fine--store { padding-top: 16px; border-top: 1px solid var(--border); }
+.ac-preview-note { margin-top: 10px; padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 8px; font-size: 12.5px; }
+.ac-link { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.ac-err { color: var(--bad); margin-top: 12px; }
+
+/* buttons for the account panels */
+.ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-strong); color: var(--text); font: 600 14px/1.2 var(--font-ui); cursor: pointer; transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out); }
+.ac-btn:hover { background: color-mix(in srgb, var(--text) 7%, var(--surface-strong)); border-color: var(--text-3); }
+.ac-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ac-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ac-btn--primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); border-color: transparent; }
+.ac-btn--quiet { border-color: transparent; background: transparent; color: var(--text-2); }
+.ac-btn--danger { border-color: transparent; background: transparent; color: var(--bad); }
+.ac-btn--danger:hover { background: color-mix(in srgb, var(--bad) 10%, transparent); border-color: transparent; }
+
+/* the signed-in menu */
+.ac-menu { width: min(340px, calc(100vw - 32px)); padding: 16px; border-radius: 12px; }
+.ac-menu .ac-me { gap: 12px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.ac-menu .ac-pop-title { font-size: 16px; }
+.ac-sync { border-radius: 8px; background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.ac-links { display: grid; gap: 0; margin: 2px 0 12px; border-top: 1px solid var(--border); }
+.ac-row-link { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px; border-bottom: 1px solid var(--border); color: var(--text); font-weight: 500; font-size: 14px; }
+.ac-row-link > span:nth-child(2) { flex: 1; }
+.ac-row-link .sh-ico:last-child { color: var(--text-3); }
+.ac-row-link:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.ac-actions { justify-content: space-between; gap: 8px; }
+
+/* the sign-in page that stands in for a play page */
+.ac-gate { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, 440px); grid-template-areas: "copy side" "extra side"; gap: 0 clamp(32px, 6vw, 96px); align-content: center; align-items: start; min-height: calc(100dvh - var(--sh-bar-h, 56px)); min-height: 100%; max-width: 1240px; padding-block: clamp(32px, 7vh, 96px); }
+.ac-gate-copy { grid-area: copy; align-self: end; }
+.ac-gate-extra { grid-area: extra; align-self: start; }
+.ac-gate-side { grid-area: side; align-self: center; }
+.ac-gate-title { margin: 10px 0 16px; font: 700 clamp(36px, 4.4vw, 60px)/1.04 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; }
+.ac-gate-lead { margin: 0 0 24px; max-width: 52ch; font-size: 18px; line-height: 1.55; color: var(--text-2); }
+.ac-gate-target { display: grid; gap: 2px; max-width: 52ch; margin: 0 0 24px; padding: 12px 16px; border: 1px solid var(--border-strong); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--surface); }
+.ac-gate-target b { font: 600 17px/1.3 var(--font-display); }
+.ac-gate-target-kind { font: 500 12px/1.4 var(--font-mono); color: var(--accent); }
+.ac-gate-points { display: grid; gap: 10px; margin: 0 0 24px; padding: 0; list-style: none; color: var(--text-2); max-width: 52ch; }
+.ac-gate-points li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; }
+.ac-gate-points .sh-ico { color: var(--ok); margin-top: 3px; }
+.ac-gate-alt { margin: 0; font-size: 14px; color: var(--text-2); max-width: 52ch; }
+.ac-gate-side .ac-card { box-shadow: var(--shadow-2); }
+@media (max-width: 900px) {
+  .ac-gate { grid-template-columns: 1fr; grid-template-areas: "copy" "side" "extra"; gap: 24px; padding-top: 20px; }
+  .ac-gate-title { font-size: 34px; }
+}
+@media (max-width: 520px) { .ac-card { padding: 22px 20px 18px; } .ac-gate-lead { font-size: 16px; } }

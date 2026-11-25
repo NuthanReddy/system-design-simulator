@@ -1,0 +1,16 @@
+{
+  "breakscale": {
+    "repository": "https://github.com/workersio/breakscale",
+    "revision": "a75b3f31859ce86750ef33f2252773d1f1ae312b",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Breakscale contributors",
+    "location": "."
+  },
+  "systemDesigner": {
+    "repository": "https://github.com/adityareddy-dev/system-designer",
+    "revision": "9eccaa31d35c162d72836b396d52a2c2a295193a",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Aditya Reddy",
+    "location": "learning"
+  }
+}

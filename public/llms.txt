@@ -1,0 +1,43 @@
+# System Design Simulator
+
+Two linked MIT-licensed workbenches for learning system design:
+
+- Simulator: individual-request discrete-event simulation with finite slots,
+  queues, retries, measured latency percentiles and failure injection.
+- System Design Lab: deterministic approximate traffic-day simulation,
+  82 practice problems, 41 lessons, 99 building blocks, cost/reliability/
+  latency/data-safety scoring and candidate-led timed interviews.
+
+The simulator retains 33 component types, 24 worked examples, 18 challenges,
+6 educational incident stories, a 48-step learning path, 119 glossary entries,
+diagram editing, saved designs, file/image exports and presentation mode.
+
+The learning workbench retains the complete practice and lesson catalogs,
+clarification/estimation/drawing workflow, daily challenges, sandbox, replay,
+reference designs, interview defenses and local progress.
+
+## Limits and privacy
+
+The engines use different formats and models; their latency/cost definitions
+cannot be equated. Neither is a production benchmark or cloud bill guarantee.
+
+Default deployment is static and account-free. Optional account sync, public
+leaderboards and encrypted short-link backends are implemented but not
+configured in the default build. GitHub Pages cannot host those APIs.
+Local progress, fragment links and file exports remain usable.
+
+Default simulator fragments are encoded, not encrypted. Anyone with the
+complete link can read them. Configured encrypted short links instead store
+ciphertext and carry a browser-only key in the fragment. Never put secrets in
+diagrams or share URLs.
+
+## Links
+
+- Simulator: https://breakscale.vercel.app/
+- Learning: https://breakscale.vercel.app/learning/
+- Glossary: https://breakscale.vercel.app/glossary/
+- Source: https://github.com/NuthanReddy/system-design-simulator
+- Feature audit: https://github.com/NuthanReddy/system-design-simulator/blob/main/FEATURE-PARITY.md
+- Hosted plan: https://github.com/NuthanReddy/system-design-simulator/blob/main/HOSTED-FEATURES-PLAN.md
+- Licenses: MIT; upstream Breakscale contributors and Aditya Reddy notices retained.
+- Upstreams: https://github.com/workersio/breakscale and https://github.com/adityareddy-dev/system-designer

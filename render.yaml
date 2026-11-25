@@ -1,0 +1,35 @@
+# Proposal only: deploying this blueprint incurs provider charges.
+services:
+  - type: web
+    name: system-design-simulator-api
+    runtime: node
+    plan: starter
+    buildCommand: node --version
+    startCommand: node learning/api/server.js
+    healthCheckPath: /health
+    autoDeploy: false
+    disk:
+      name: progress
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: REPLAY_WORKERS
+        value: '1'
+      - key: DB_PATH
+        value: /var/data/system-design-simulator.db
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SITE_URL
+        sync: false
+      - key: API_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false

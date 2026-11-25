@@ -1,0 +1,59 @@
+{
+  "name": "system-design-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:links": "bun run --cwd worker dev & VITE_SHARE_API=http://localhost:8787 vite; kill 0",
+    "build:webview": "vite build --config vite.webview.config.ts",
+    "build:extension": "bun run build:webview && bun run --cwd extension build",
+    "build": "tsc -b && vite build && node tools/build-learning.mjs",
+    "preview": "vite preview",
+    "smoke:site": "node tools/smoke-site.mjs",
+    "smoke:hosted": "node tools/smoke-hosted.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b --noEmit",
+    "prepare": "husky",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:ui": "playwright test --ui"
+  },
+  "dependencies": {
+    "lucide": "^1.70.0",
+    "lucide-react": "^1.70.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "@vitest/coverage-v8": "^5.1.0",
+    "esbuild": "^0.25.12",
+    "husky": "^9.1.7",
+    "jsdom": "^31.0.1",
+    "lint-staged": "^17.6.0",
+    "oxlint": "^1.92.0",
+    "prettier": "^3.9.10",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "license": "MIT",
+  "description": "Build a system, load it until it breaks, and watch why",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NuthanReddy/system-design-simulator.git"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,css,json,md}": "prettier --write"
+  }
+}

@@ -1,0 +1,49 @@
+name: Deploy website
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SITE_BASE: ${{ vars.SITE_BASE }}
+      SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+      SD_SITE_URL: ${{ vars.SD_SITE_URL }}
+      SD_API_URL: ${{ vars.SD_API_URL }}
+      SD_API_LIVE: ${{ vars.SD_API_LIVE }}
+      VITE_SHARE_API: ${{ vars.VITE_SHARE_API }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: node --test learning/api/test/*.test.js
+      - run: bunx tsc -p worker/tsconfig.json
+      - run: bun run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish compiled website
+        id: deployment
+        uses: actions/deploy-pages@v4
